@@ -11,7 +11,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 @EnableDiscoveryClient
 @EnableDubbo
 public class UserServiceApplication {
-    public static void main( String[] args ) {
+    public static void main(String[] args) {
         SpringApplication.run(UserServiceApplication.class, args);
     }
 }

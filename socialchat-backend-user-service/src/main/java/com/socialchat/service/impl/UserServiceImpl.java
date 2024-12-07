@@ -1,0 +1,121 @@
+package com.socialchat.service.impl;
+
+import cn.hutool.crypto.digest.DigestUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.socialchat.common.BaseResponse;
+import com.socialchat.common.ErrorCode;
+import com.socialchat.common.ResultUtils;
+import com.socialchat.constant.UserConstant;
+import com.socialchat.dao.UserMapper;
+import com.socialchat.exception.BusinessException;
+import com.socialchat.model.entity.User;
+import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.service.UserService;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.time.Duration;
+
+/**
+ * (TbUser)表服务实现类
+ *
+ * @author makejava
+ * @since 2024-12-15 16:24:38
+ */
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private UserMapper userMapper;
+
+    @Override
+    public Boolean getVerifyCode(String userEmail) {
+        // 判断和上次生成验证码是否超过 60s 限制的 key
+        String restrictKey = userEmail + UserConstant.USER_EMAIL_RESTRICT_KEY;
+        // 如果还没达到一分钟
+        if (stringRedisTemplate.hasKey(restrictKey)) {
+            // todo 后面可以加上黑名单等措施，定时任务等等，现在简单地返回 false 代表不生成
+            return false;
+        }
+
+        String verifyCode = generateVerifyCode();
+
+        // 发送验证码
+        boolean flag = sendVerifyCode(userEmail);
+
+        if (!flag) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "验证码发送失败");
+        }
+
+        // 将验证码存储在 redis 中，限制 key 存活时间为 60s，验证码存活时间为 300s
+        stringRedisTemplate.opsForValue().set(restrictKey, userEmail, Duration.ofSeconds(60));
+        stringRedisTemplate.opsForValue().set(userEmail + UserConstant.USER_EMAIL_REGISTER_PREFIX, verifyCode, Duration.ofSeconds(5 * 60));
+        return true;
+    }
+
+    @Override
+    public Boolean register(UserRegisterRequest userRegisterRequest) {
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String userEmail = userRegisterRequest.getUserEmail();
+        String verifyCode = userRegisterRequest.getVerifyCode();
+        String encryptUserPassword = DigestUtil.md5Hex(UserConstant.SALT + userPassword);
+
+        // 先校验验证码
+        String redisVerifyCode = stringRedisTemplate.opsForValue().get(userEmail + UserConstant.USER_EMAIL_REGISTER_PREFIX);
+        String encryptVerifyCode = DigestUtil.md5Hex(UserConstant.SALT + verifyCode);
+        // 验证码不存在或者验证码不相同
+        if (StringUtils.isBlank(redisVerifyCode) || !StringUtils.equalsIgnoreCase(redisVerifyCode, encryptVerifyCode)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误或验证码已过期");
+        }
+
+        // 再校验账号和邮箱
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper
+                .eq(StringUtils.isNotBlank(userAccount), User::getUserAccount, userAccount)
+                .or()
+                .eq(StringUtils.isNotBlank(userEmail), User::getUserEmail, userEmail);
+        User user = userMapper.selectOne(queryWrapper);
+        // 如果用户名或者账号其中一个存在数据库中，则注册失败
+        if (user != null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该账号或密码已存在，请勿重复注册");
+        }
+
+        // 注册新用户，插入用户信息
+        user = new User();
+        user.setUserAccount(userAccount);
+        user.setUserPassword(encryptUserPassword);
+        user.setUserEmail(userEmail);
+        int insert = userMapper.insert(user);
+
+        return insert > 0;
+    }
+
+    /**
+     * 发送验证码
+     *
+     * @param userEmail
+     * @return
+     */
+    private boolean sendVerifyCode(String userEmail) {
+
+        return true;
+    }
+
+    /**
+     * 生成验证码
+     *
+     * @return
+     */
+    private String generateVerifyCode() {
+        return "code";
+    }
+}
+

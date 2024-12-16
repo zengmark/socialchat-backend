@@ -3,27 +3,27 @@ package com.socialchat.service.impl;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
-import com.socialchat.common.ResultUtils;
 import com.socialchat.constant.UserConstant;
 import com.socialchat.dao.UserMapper;
+import com.socialchat.email.EmailHelper;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.User;
 import com.socialchat.model.request.UserRegisterRequest;
 import com.socialchat.service.UserService;
+import com.socialchat.utils.CodeGeneratorUtil;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.mail.MessagingException;
 import java.time.Duration;
 
 /**
- * (TbUser)表服务实现类
+ * (tb_user)表服务实现类
  *
- * @author makejava
+ * @author 清闲
  * @since 2024-12-15 16:24:38
  */
 @Service
@@ -35,6 +35,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Resource
     private UserMapper userMapper;
 
+    @Resource
+    private EmailHelper emailHelper;
+
     @Override
     public Boolean getVerifyCode(String userEmail) {
         // 判断和上次生成验证码是否超过 60s 限制的 key
@@ -45,10 +48,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             return false;
         }
 
-        String verifyCode = generateVerifyCode();
+        String verifyCode = CodeGeneratorUtil.generateCode(6);
 
-        // 发送验证码
-        boolean flag = sendVerifyCode(userEmail);
+        // 发送验证码 todo 这里直接发送的话高并发流量下会存在性能瓶颈，后期引入 MQ 削峰
+        boolean flag = false;
+        try {
+            flag = emailHelper.sendEmail(userEmail, verifyCode);
+        } catch (MessagingException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "验证码发送失败");
+        }
 
         if (!flag) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "验证码发送失败");
@@ -98,24 +106,4 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return insert > 0;
     }
 
-    /**
-     * 发送验证码
-     *
-     * @param userEmail
-     * @return
-     */
-    private boolean sendVerifyCode(String userEmail) {
-
-        return true;
-    }
-
-    /**
-     * 生成验证码
-     *
-     * @return
-     */
-    private String generateVerifyCode() {
-        return "code";
-    }
 }
-

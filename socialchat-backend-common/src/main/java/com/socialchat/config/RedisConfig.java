@@ -13,7 +13,7 @@ public class RedisConfig {
     /**
      * 自定义 RedisTemplate
      */
-    @Bean
+    @Bean(value = "redisTemplate")
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);

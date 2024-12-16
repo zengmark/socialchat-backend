@@ -8,19 +8,22 @@ import com.socialchat.model.request.UserRegisterRequest;
 import com.socialchat.service.UserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.extern.slf4j.Slf4j;
+import org.jasypt.encryption.StringEncryptor;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 
 @RestController
 @Api(tags = "用户模块")
+@Slf4j
 public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private StringEncryptor encryptor;
 
     @ApiOperation("测试接口")
     @GetMapping("/test")
@@ -28,8 +31,16 @@ public class UserController {
         return "test";
     }
 
+    @ApiOperation("jasypt加密接口")
+    @GetMapping("/jasypt")
+    public String jasypt(@RequestParam("encryptContent") String encryptContent) {
+        String encrypt = "ENC(" + encryptor.encrypt(encryptContent) + ")";
+        log.info("加密后的为：" + encrypt);
+        return encrypt;
+    }
+
     @ApiOperation("获取验证码")
-    @GetMapping("/getVerifyCode")
+    @PostMapping("/getVerifyCode")
     public BaseResponse<Boolean> getVerifyCode(@RequestBody UserRegisterRequest userRegisterRequest) {
         if (userRegisterRequest == null || userRegisterRequest.getUserEmail() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱不能为空");

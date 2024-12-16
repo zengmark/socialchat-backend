@@ -1,18 +1,15 @@
 package com.socialchat.model.entity;
 
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.activerecord.Model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.io.Serializable;
+import java.util.Date;
 
 /**
- * (TbUser)表实体类
+ * (tb_user)表实体类
  *
- * @author makejava
+ * @author 清闲
  * @since 2024-12-15 16:24:35
  */
 @Data

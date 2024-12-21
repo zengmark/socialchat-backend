@@ -1,9 +1,11 @@
 package com.socialchat.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -15,7 +17,7 @@ import java.util.Date;
 @Data
 @EqualsAndHashCode
 @TableName(value = "tb_user")
-public class User {
+public class User implements Serializable {
     //主键ID
     private Long id;
     //用户名
@@ -40,5 +42,8 @@ public class User {
     private Date updateTime;
     //软删除标记
     private Integer isDeleted;
+
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 }
 

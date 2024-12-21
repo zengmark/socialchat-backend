@@ -1,5 +1,6 @@
 package com.socialchat.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,10 +10,13 @@ import com.socialchat.dao.UserMapper;
 import com.socialchat.email.EmailHelper;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.User;
+import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
 import com.socialchat.utils.CodeGeneratorUtil;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -49,9 +53,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         String verifyCode = CodeGeneratorUtil.generateCode(6);
+        String encryptVerifyCode = DigestUtil.md5Hex(UserConstant.SALT + verifyCode);
 
         // 发送验证码 todo 这里直接发送的话高并发流量下会存在性能瓶颈，后期引入 MQ 削峰
-        boolean flag = false;
+        boolean flag;
         try {
             flag = emailHelper.sendEmail(userEmail, verifyCode);
         } catch (MessagingException e) {
@@ -64,7 +69,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 将验证码存储在 redis 中，限制 key 存活时间为 60s，验证码存活时间为 300s
         stringRedisTemplate.opsForValue().set(restrictKey, userEmail, Duration.ofSeconds(60));
-        stringRedisTemplate.opsForValue().set(userEmail + UserConstant.USER_EMAIL_REGISTER_PREFIX, verifyCode, Duration.ofSeconds(5 * 60));
+        stringRedisTemplate.opsForValue().set(userEmail + UserConstant.USER_EMAIL_REGISTER_PREFIX, encryptVerifyCode, Duration.ofSeconds(5 * 60));
         return true;
     }
 
@@ -93,7 +98,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User user = userMapper.selectOne(queryWrapper);
         // 如果用户名或者账号其中一个存在数据库中，则注册失败
         if (user != null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该账号或密码已存在，请勿重复注册");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该账号或邮箱已存在，请勿重复注册");
         }
 
         // 注册新用户，插入用户信息
@@ -104,6 +109,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         int insert = userMapper.insert(user);
 
         return insert > 0;
+    }
+
+    @Override
+    public UserVO login(UserLoginRequest userLoginRequest) {
+        String userAccount = userLoginRequest.getUserAccount();
+        String userPassword = userLoginRequest.getUserPassword();
+        String encryptUserPassword = DigestUtil.md5Hex(UserConstant.SALT + userPassword);
+        if (StringUtils.isAnyBlank(userAccount, userPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号或密码不能为空");
+        }
+
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(StringUtils.isNotBlank(userAccount), User::getUserAccount, userAccount);
+        queryWrapper.eq(StringUtils.isNotBlank(encryptUserPassword), User::getUserPassword, encryptUserPassword);
+        User user = userMapper.selectOne(queryWrapper);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该账号对应用户不存在或密码错误");
+        }
+
+        StpUtil.login(userAccount);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
     }
 
 }

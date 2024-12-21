@@ -1,10 +1,15 @@
 package com.socialchat.controller;
 
+import cn.dev33.satoken.stp.SaTokenInfo;
+import cn.dev33.satoken.stp.StpUtil;
+import cn.dev33.satoken.util.SaResult;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
+import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -25,10 +30,10 @@ public class UserController {
     @Resource
     private StringEncryptor encryptor;
 
-    @ApiOperation("测试接口")
+    @ApiOperation("获取登录用户信息 token 值，仅测试使用，生产关闭")
     @GetMapping("/test")
-    public String test() {
-        return "test";
+    public SaTokenInfo test() {
+        return StpUtil.getTokenInfo();
     }
 
     @ApiOperation("jasypt加密接口")
@@ -56,5 +61,15 @@ public class UserController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "注册参数为空");
         }
         return ResultUtils.success(userService.register(userRegisterRequest));
+    }
+
+    @ApiOperation("登录")
+    @PostMapping("/login")
+    public BaseResponse<UserVO> login(@RequestBody UserLoginRequest userLoginRequest) {
+        if (userLoginRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "登录参数为空");
+        }
+        UserVO userVO = userService.login(userLoginRequest);
+        return ResultUtils.success(userVO);
     }
 }

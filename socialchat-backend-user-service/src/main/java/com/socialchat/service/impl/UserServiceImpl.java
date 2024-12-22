@@ -15,6 +15,7 @@ import com.socialchat.model.request.UserRegisterRequest;
 import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
 import com.socialchat.utils.CodeGeneratorUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,6 +32,7 @@ import java.time.Duration;
  * @since 2024-12-15 16:24:38
  */
 @Service
+@Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Resource
@@ -49,6 +51,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 如果还没达到一分钟
         if (stringRedisTemplate.hasKey(restrictKey)) {
             // todo 后面可以加上黑名单等措施，定时任务等等，现在简单地返回 false 代表不生成
+            log.info("该用户在60s内已经发送过验证码{}，拒绝此次发送", userEmail);
             return false;
         }
 
@@ -60,10 +63,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         try {
             flag = emailHelper.sendEmail(userEmail, verifyCode);
         } catch (MessagingException e) {
+            log.error("验证码发送失败，邮箱为{}", userEmail);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "验证码发送失败");
         }
 
         if (!flag) {
+            log.error("验证码发送失败，邮箱为{}", userEmail);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "验证码发送失败");
         }
 

@@ -16,6 +16,7 @@ import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
 import com.socialchat.utils.CodeGeneratorUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import javax.mail.MessagingException;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * (tb_user)表服务实现类
@@ -51,7 +53,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 如果还没达到一分钟
         if (stringRedisTemplate.hasKey(restrictKey)) {
             // todo 后面可以加上黑名单等措施，定时任务等等，现在简单地返回 false 代表不生成
-            log.info("该用户在60s内已经发送过验证码{}，拒绝此次发送", userEmail);
+            log.info("该用户在60s内已经发送过验证码，邮箱为{}，拒绝此次发送", userEmail);
             return false;
         }
 
@@ -100,14 +102,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .eq(StringUtils.isNotBlank(userAccount), User::getUserAccount, userAccount)
                 .or()
                 .eq(StringUtils.isNotBlank(userEmail), User::getUserEmail, userEmail);
-        User user = userMapper.selectOne(queryWrapper);
+        List<User> userList = userMapper.selectList(queryWrapper);
         // 如果用户名或者账号其中一个存在数据库中，则注册失败
-        if (user != null) {
+        if (CollectionUtils.isNotEmpty(userList)) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该账号或邮箱已存在，请勿重复注册");
         }
 
         // 注册新用户，插入用户信息
-        user = new User();
+        User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptUserPassword);
         user.setUserEmail(userEmail);
@@ -136,7 +138,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         StpUtil.login(userAccount);
         UserVO userVO = new UserVO();
         BeanUtils.copyProperties(user, userVO);
+
+        // 存储在 session 中，便于获取用户信息
+        StpUtil.getSession().set(UserConstant.USERINFO, userVO);
         return userVO;
+    }
+
+    @Override
+    public boolean deleteUser() {
+        UserVO userVO = (UserVO) StpUtil.getSession().get(UserConstant.USERINFO);
+        int delete = userMapper.deleteById(userVO.getId());
+        if (delete == 0) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户删除失败，用户已不存在");
+        }
+        return true;
     }
 
 }

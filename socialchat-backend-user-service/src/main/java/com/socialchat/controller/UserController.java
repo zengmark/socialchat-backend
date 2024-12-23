@@ -2,7 +2,6 @@ package com.socialchat.controller;
 
 import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.dev33.satoken.util.SaResult;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
@@ -71,5 +70,19 @@ public class UserController {
         }
         UserVO userVO = userService.login(userLoginRequest);
         return ResultUtils.success(userVO);
+    }
+
+    @ApiOperation("退出登录")
+    @PostMapping("/logout")
+    public BaseResponse<Boolean> logout() {
+        StpUtil.logout();
+        return ResultUtils.success(true);
+    }
+
+    @ApiOperation("注销用户")
+    @PostMapping("/deleteUser")
+    public BaseResponse<Boolean> deleteUser() {
+        boolean flag = userService.deleteUser();
+        return ResultUtils.success(flag);
     }
 }

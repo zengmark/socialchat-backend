@@ -1,7 +1,6 @@
 package com.socialchat.email;
 
 
-import com.socialchat.utils.CodeGeneratorUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -30,7 +29,7 @@ public class EmailHelper {
         //设置一个html邮件信息
         helper.setText("<p style='color: blue'>你的验证码为：" + verifyCode + "(有效期为五分钟)</p>", true);
         //设置邮件主题名
-        helper.setSubject("FlowerPotNet验证码----验证码");
+        helper.setSubject("socialchat平台验证码----验证码");
         //发给谁-》邮箱地址
         helper.setTo(email);
         //谁发的-》发送人邮箱

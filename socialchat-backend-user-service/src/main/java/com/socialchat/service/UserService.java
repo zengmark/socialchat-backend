@@ -37,5 +37,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     UserVO login(UserLoginRequest userLoginRequest);
+
+    /**
+     * 注销用户
+     *
+     * @return
+     */
+    boolean deleteUser();
 }
 

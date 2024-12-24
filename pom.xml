@@ -13,6 +13,7 @@
         <module>socialchat-backend-user-service</module>
         <module>socialchat-backend-gateway</module>
         <module>socialchat-backend-common</module>
+        <module>socialchat-backend-post-service</module>
     </modules>
 
     <properties>

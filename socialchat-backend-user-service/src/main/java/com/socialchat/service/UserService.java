@@ -36,7 +36,7 @@ public interface UserService extends IService<User> {
      * @param userLoginRequest
      * @return
      */
-    UserVO login(UserLoginRequest userLoginRequest);
+    String login(UserLoginRequest userLoginRequest);
 
     /**
      * 注销用户
@@ -44,5 +44,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean deleteUser();
+
+    /**
+     * 获取登录用户信息
+     *
+     * @return
+     */
+    UserVO getLoginUser();
 }
 

@@ -1,5 +1,6 @@
 package com.socialchat.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.socialchat.service.PostService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

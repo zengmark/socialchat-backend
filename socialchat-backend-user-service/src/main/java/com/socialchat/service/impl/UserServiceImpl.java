@@ -21,9 +21,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.annotation.Resource;
 import javax.mail.MessagingException;
+import javax.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.util.List;
 
@@ -119,7 +123,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public UserVO login(UserLoginRequest userLoginRequest) {
+    public String login(UserLoginRequest userLoginRequest) {
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
         String encryptUserPassword = DigestUtil.md5Hex(UserConstant.SALT + userPassword);
@@ -140,8 +144,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         BeanUtils.copyProperties(user, userVO);
 
         // 存储在 session 中，便于获取用户信息
-        StpUtil.getSession().set(UserConstant.USERINFO, userVO);
-        return userVO;
+        StpUtil.getTokenSession().set(UserConstant.USERINFO, userVO);
+        return StpUtil.getTokenValue();
     }
 
     @Override
@@ -152,6 +156,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户删除失败，用户已不存在");
         }
         return true;
+    }
+
+    @Override
+    public UserVO getLoginUser() {
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String header = request.getHeader(UserConstant.AUTHORIZATION);
+        String token = header.substring(7);
+
+        UserVO userVO = (UserVO) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        return userVO;
     }
 
 }

@@ -2,9 +2,12 @@ package com.socialchat.controller;
 
 import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.http.server.HttpServerRequest;
+import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
+import com.socialchat.constant.UserConstant;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
@@ -64,12 +67,12 @@ public class UserController {
 
     @ApiOperation("登录")
     @PostMapping("/login")
-    public BaseResponse<UserVO> login(@RequestBody UserLoginRequest userLoginRequest) {
+    public BaseResponse<String> login(@RequestBody UserLoginRequest userLoginRequest) {
         if (userLoginRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "登录参数为空");
         }
-        UserVO userVO = userService.login(userLoginRequest);
-        return ResultUtils.success(userVO);
+        String token = userService.login(userLoginRequest);
+        return ResultUtils.success(token);
     }
 
     @ApiOperation("退出登录")
@@ -84,5 +87,13 @@ public class UserController {
     public BaseResponse<Boolean> deleteUser() {
         boolean flag = userService.deleteUser();
         return ResultUtils.success(flag);
+    }
+
+    @ApiOperation("获取登录用户信息")
+    @PostMapping("/getLoginUser")
+    @AuthCheck
+    public BaseResponse<UserVO> getLoginUser() {
+        UserVO userVO = userService.getLoginUser();
+        return ResultUtils.success(userVO);
     }
 }

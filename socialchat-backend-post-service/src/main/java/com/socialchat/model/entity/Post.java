@@ -1,5 +1,6 @@
 package com.socialchat.model.entity;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -7,6 +8,7 @@ import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 /**
  * (tb_post)表实体类
@@ -28,6 +30,8 @@ public class Post implements Serializable {
     private String postContent;
     //帖子图片数组
     private String postPictures;
+    //@用户的id数组
+    private String userAt;
     //点赞数
     private Integer likeNum;
     //评论数
@@ -42,6 +46,22 @@ public class Post implements Serializable {
     private Date updateTime;
     //软删除标记
     private Integer isDeleted;
+
+    public void setPostPictureList(List<String> pictureList) {
+        this.postPictures = JSON.toJSONString(pictureList);
+    }
+
+    public List<String> getPostPictureList() {
+        return JSON.parseArray(this.postPictures, String.class);
+    }
+
+    public void setUserAtList(List<Long> userIdList) {
+        this.userAt = JSON.toJSONString(userIdList);
+    }
+
+    public List<Long> getUserAtList() {
+        return JSON.parseArray(this.userAt, Long.class);
+    }
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

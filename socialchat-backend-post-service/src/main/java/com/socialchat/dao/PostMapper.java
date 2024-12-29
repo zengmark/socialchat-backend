@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.socialchat.model.entity.Post;
 
 /**
- * (Post)表数据库访问层
+ * (tb_post)表数据库访问层
  *
  * @author makejava
  * @since 2024-12-24 22:05:39

@@ -2,12 +2,10 @@ package com.socialchat.controller;
 
 import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.http.server.HttpServerRequest;
 import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
-import com.socialchat.constant.UserConstant;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;

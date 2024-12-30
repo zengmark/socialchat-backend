@@ -19,8 +19,6 @@ public class PostSaveRequest implements Serializable {
 
     private List<Long> userAtList;
 
-    private VoteRequest voteRequest;
-
     /**
      * 是否可见
      * 0 所有人可见
@@ -29,12 +27,16 @@ public class PostSaveRequest implements Serializable {
      */
     private Integer visible;
 
+    private VoteRequest voteRequest;
+
     /**
      * 投票功能项
      */
     @Data
     public static class VoteRequest implements Serializable {
         private static final long serialVersionUID = 1L;
+
+        private Boolean hasVote;
 
         private String voteTitle;
 

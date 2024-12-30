@@ -12,6 +12,7 @@ import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.User;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.model.session.UserSession;
 import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
 import com.socialchat.utils.CodeGeneratorUtil;
@@ -140,18 +141,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         StpUtil.login(userAccount);
-        UserVO userVO = new UserVO();
-        BeanUtils.copyProperties(user, userVO);
+        UserSession userSession = new UserSession();
+        BeanUtils.copyProperties(user, userSession);
 
         // 存储在 session 中，便于获取用户信息
-        StpUtil.getTokenSession().set(UserConstant.USERINFO, userVO);
+        StpUtil.getTokenSession().set(UserConstant.USERINFO, userSession);
         return StpUtil.getTokenValue();
     }
 
     @Override
     public boolean deleteUser() {
-        UserVO userVO = (UserVO) StpUtil.getSession().get(UserConstant.USERINFO);
-        int delete = userMapper.deleteById(userVO.getId());
+        UserSession userSession = (UserSession) StpUtil.getSession().get(UserConstant.USERINFO);
+        int delete = userMapper.deleteById(userSession.getId());
         if (delete == 0) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户删除失败，用户已不存在");
         }
@@ -165,7 +166,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String header = request.getHeader(UserConstant.AUTHORIZATION);
         String token = header.substring(7);
 
-        UserVO userVO = (UserVO) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        UserSession userSession = (UserSession) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(userSession, userVO);
         return userVO;
     }
 

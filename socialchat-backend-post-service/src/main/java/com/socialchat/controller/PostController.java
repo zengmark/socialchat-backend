@@ -7,6 +7,7 @@ import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.helper.ImageServiceHelper;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.io.IOException;
 
 @RestController
 @Api(tags = "帖子模块")
@@ -50,6 +52,11 @@ public class PostController {
         if (file == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "上传图片文件不能为空");
         }
+//        try {
+//            imageServiceHelper.uploadImageToGitee(file);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
         imageServiceHelper.uploadImageToGiteeAsync(file, sessionId);
         return ResultUtils.success(true);
     }

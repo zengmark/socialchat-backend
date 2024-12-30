@@ -1,6 +1,8 @@
 package com.socialchat.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.Date;
 
@@ -11,6 +13,8 @@ import java.util.Date;
  * @since 2024-12-30 01:13:41
  */
 @Data
+@EqualsAndHashCode
+@TableName(value = "tb_vote")
 public class Vote {
     //主键ID
     private Long id;

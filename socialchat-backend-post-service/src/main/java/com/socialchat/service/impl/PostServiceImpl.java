@@ -10,10 +10,12 @@ import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.service.PostService;
 import com.socialchat.service.VoteService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -41,7 +43,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         String postTitle = request.getPostTitle();
         String postContent = request.getPostContent();
         List<String> postPictureList = request.getPostPictureList();
-        List<Long> userAtList = request.getUserAtList();
+        List<Long> userAtList = CollectionUtils.isEmpty(request.getUserAtList()) ? new ArrayList<>() : request.getUserAtList();
         Integer visible = request.getVisible();
         PostSaveRequest.VoteRequest voteRequest = request.getVoteRequest();
 
@@ -50,11 +52,11 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         post.setPostTitle(postTitle);
         post.setPostContent(postContent);
         post.setPostPictureList(postPictureList);
-        post.setUserAtList(userAtList);
         post.setVisible(visible);
+        post.setUserAtList(userAtList);
         int insert = postMapper.insert(post);
 
-        if (ObjectUtil.isNotNull(voteRequest)) {
+        if (ObjectUtil.isNotNull(voteRequest) && voteRequest.getHasVote()) {
             String voteTitle = voteRequest.getVoteTitle();
             List<String> voteItemList = voteRequest.getVoteItemList();
             Long postId = post.getId();

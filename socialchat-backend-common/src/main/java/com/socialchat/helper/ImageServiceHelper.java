@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialchat.handler.UploadWebSocketHandler;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
+import okhttp3.RequestBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -76,7 +77,7 @@ public class ImageServiceHelper {
 
         // Create request
         OkHttpClient client = new OkHttpClient();
-        okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonPayload, MediaType.get("application/json"));
+        RequestBody body = RequestBody.create(MediaType.get("application/json"), jsonPayload);
         String uploadImgUrl = giteeApiUrl + "/repos/" + repoOwner + "/" + repoName + "/contents/" + UUID.randomUUID().getLeastSignificantBits() + file.getOriginalFilename();
         Request request = new Request.Builder()
                 .url(uploadImgUrl)

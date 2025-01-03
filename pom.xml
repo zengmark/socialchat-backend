@@ -14,6 +14,7 @@
         <module>socialchat-backend-gateway</module>
         <module>socialchat-backend-common</module>
         <module>socialchat-backend-post-service</module>
+        <module>socialchat-backend-comment-service</module>
     </modules>
 
     <properties>

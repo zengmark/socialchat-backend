@@ -73,6 +73,8 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             voteService.saveBatch(voteList);
         }
 
+        // todo：如果是所有人可见，即 visible 为 0 的时候，需要同步数据到 es 中
+
         return insert > 0;
     }
 }

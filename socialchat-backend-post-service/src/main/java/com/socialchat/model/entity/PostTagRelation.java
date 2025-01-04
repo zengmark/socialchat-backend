@@ -1,24 +1,22 @@
 package com.socialchat.model.entity;
 
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.activerecord.Model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
- * (tb_post_tag)表实体类
+ * (tb_post_tag_relation)表实体类
  *
  * @author makejava
  * @since 2025-01-01 23:33:58
  */
 @Data
 @EqualsAndHashCode
-@TableName(value = "tb_post_tag")
+@TableName(value = "tb_post_tag_relation")
 public class PostTagRelation implements Serializable {
     //主键ID
     private Long id;

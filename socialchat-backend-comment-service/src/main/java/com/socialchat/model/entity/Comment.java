@@ -1,14 +1,12 @@
 package com.socialchat.model.entity;
 
-import java.util.Date;
-
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.activerecord.Model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
  * (tb_comment)表实体类
@@ -24,6 +22,10 @@ public class Comment implements Serializable {
     private Long id;
     //评论人ID
     private Long userId;
+    //评论人用户名
+    private String userName;
+    //评论人头像链接
+    private String userAvatar;
     //评论帖子ID
     private Long postId;
     //评论类型，0 代表评论的是帖子，1 代表评论的是评论
@@ -34,6 +36,8 @@ public class Comment implements Serializable {
     private String commentContent;
     //被评论人ID
     private Long targetUserId;
+    //被评论人用户名
+    private String targetUserName;
     //被评论人头像链接
     private String targetUserAvatar;
     //评论点赞数

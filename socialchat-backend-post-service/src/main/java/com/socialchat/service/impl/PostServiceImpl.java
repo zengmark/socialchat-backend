@@ -4,6 +4,8 @@ import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.socialchat.dao.PostMapper;
+import com.socialchat.es.document.PostDocument;
+import com.socialchat.es.repository.PostDocumentRepository;
 import com.socialchat.model.entity.Post;
 import com.socialchat.model.entity.Vote;
 import com.socialchat.model.request.PostSaveRequest;
@@ -11,6 +13,7 @@ import com.socialchat.service.PostService;
 import com.socialchat.service.VoteService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
 
     @Resource
     private VoteService voteService;
+
+    @Resource
+    private PostDocumentRepository postDocumentRepository;
 
     @Transactional
     @Override
@@ -75,7 +81,16 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
 
         // todo：如果是所有人可见，即 visible 为 0 的时候，需要同步数据到 es 中
 
+
         return insert > 0;
+    }
+
+    // todo：保存到 ES，后期需要确定逻辑，目前只是一个架子
+    private void savePostToEs(PostSaveRequest request) {
+        PostDocument postDocument = new PostDocument();
+        BeanUtils.copyProperties(request, postDocument);
+
+        postDocumentRepository.save(postDocument);
     }
 }
 

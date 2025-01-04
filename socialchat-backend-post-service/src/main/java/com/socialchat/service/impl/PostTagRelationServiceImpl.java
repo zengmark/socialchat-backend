@@ -7,7 +7,7 @@ import com.socialchat.service.PostTagRelationService;
 import org.springframework.stereotype.Service;
 
 /**
- * (tb_post_tag)表服务实现类
+ * (tb_post_tag_relation)表服务实现类
  *
  * @author makejava
  * @since 2025-01-01 23:33:58

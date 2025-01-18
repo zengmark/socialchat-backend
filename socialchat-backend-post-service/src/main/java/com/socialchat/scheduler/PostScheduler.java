@@ -2,6 +2,7 @@ package com.socialchat.scheduler;
 
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.json.JSONObject;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 @Slf4j
 public class PostScheduler implements CommandLineRunner {
+
     @Override
     public void run(String... args) throws Exception {
         OkHttpClient client = new OkHttpClient.Builder()
@@ -25,29 +27,44 @@ public class PostScheduler implements CommandLineRunner {
         String url = "https://api.codefather.cn/api/essay/list/page/vo";
 
         MediaType mediaType = MediaType.parse("application/json; charset=utf-8");
-        String json = "{\"pageSize\":10,\"sortOrder\":\"descend\",\"sortField\":\"createTime\",\"tags\":[],\"current\":1,\"reviewStatus\":1}";
-        RequestBody body = RequestBody.create(mediaType, json);
+        String requestJSONTemplate = "{\"pageSize\":10,\"sortOrder\":\"descend\",\"sortField\":\"createTime\",\"tags\":[],\"current\":%d,\"reviewStatus\":1}";
+        for (int i = 0; i < 1; i++) {
+            String requestJSON = String.format(requestJSONTemplate, i + 1);
+            RequestBody body = RequestBody.create(mediaType, requestJSON);
 
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .header("Content-Type", "application/json")
-                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-                .build();
+            Request request = new Request.Builder()
+                    .url(url)
+                    .post(body)
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                    .build();
 
-        try (Response response = client.newCall(request).execute()) {
-            if (response.isSuccessful()) {
-                String responseBody = response.body().string();
-                log.info("编程导航响应数据：{}", responseBody);
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    JSONObject jsonObject = new JSONObject(responseBody);
+                    log.info("编程导航响应数据：{}", jsonObject);
 
-                // 写入文件
-                writeToFile(responseBody);
-            } else {
-                log.error("请求失败，状态码：{}", response.code());
+                    initData(jsonObject);
+
+                    // 写入文件
+                    writeToFile(responseBody);
+                } else {
+                    log.error("请求失败，状态码：{}", response.code());
+                }
+            } catch (IOException e) {
+                log.error("请求过程中发生异常", e);
             }
-        } catch (IOException e) {
-            log.error("请求过程中发生异常", e);
         }
+    }
+
+    /**
+     * 初始化数据
+     *
+     * @param jsonObject
+     */
+    private void initData(JSONObject jsonObject) {
+
     }
 
     /**

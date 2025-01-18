@@ -8,10 +8,12 @@ import com.socialchat.dao.CommentMapper;
 import com.socialchat.model.entity.Comment;
 import com.socialchat.model.remote.comment.CommentPostDTO;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.beans.BeanUtils;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +36,7 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
 
         // 2、获取帖子下的外层评论
         Page<Comment> commentOutsidePage = commentMapper.selectPage(new Page<>(current, pageSize), outsideQueryWrapper);
-        List<Comment> commentOutsideList = commentOutsidePage.getRecords();
+        List<Comment> commentOutsideList = CollectionUtils.isNotEmpty(commentOutsidePage.getRecords()) ? commentOutsidePage.getRecords() : new ArrayList<>();
 
         // 3、组装外层每个评论的内层评论
         List<CommentPostDTO> outsideCommentPostDTOList = commentOutsideList.stream()
@@ -50,7 +52,7 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
                     insideQueryWrapper.orderByDesc(Comment::getLikeNum).orderByDesc(Comment::getCreateTime);
 
                     Page<Comment> commentInsidePage = commentMapper.selectPage(new Page<>(CommentConstant.HOT_START, CommentConstant.HOT_END), insideQueryWrapper);
-                    List<Comment> commentInsideList = commentInsidePage.getRecords();
+                    List<Comment> commentInsideList = CollectionUtils.isNotEmpty(commentInsidePage.getRecords()) ? commentInsidePage.getRecords() : new ArrayList<>();
                     List<CommentPostDTO> insideCommentPostDTOList = commentInsideList.stream()
                             .map(insideComment -> {
                                 CommentPostDTO insideCommentPostDTO = new CommentPostDTO();
@@ -75,8 +77,9 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
         queryWrapper.eq(Comment::getTargetId, commentId);
         queryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
         queryWrapper.orderByDesc(Comment::getCreateTime);
+
         Page<Comment> commentPage = commentMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
-        List<Comment> commentList = commentPage.getRecords();
+        List<Comment> commentList = CollectionUtils.isNotEmpty(commentPage.getRecords()) ? commentPage.getRecords() : new ArrayList<>();
         List<CommentPostDTO> commentPostDTOList = commentList.stream()
                 .map(comment -> {
                     CommentPostDTO commentPostDTO = new CommentPostDTO();

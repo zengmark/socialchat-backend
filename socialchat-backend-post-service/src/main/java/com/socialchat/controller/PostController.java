@@ -1,5 +1,6 @@
 package com.socialchat.controller;
 
+import cn.hutool.core.util.ObjectUtil;
 import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
@@ -7,10 +8,12 @@ import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.helper.ImageServiceHelper;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.service.PostService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,7 +37,7 @@ public class PostController {
     }
 
     @ApiOperation("保存帖子")
-    @PostMapping("/save")
+    @PostMapping("/savePost")
     @AuthCheck
     public BaseResponse<Boolean> savePost(@RequestBody PostSaveRequest request) {
         if (request == null) {
@@ -46,20 +49,39 @@ public class PostController {
 
     @ApiOperation("上传图片")
     @PostMapping("/uploadPostImage")
+    @AuthCheck
     public BaseResponse<Boolean> uploadPostImage(@RequestParam MultipartFile file, @RequestParam("sessionId") String sessionId) {
         if (file == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "上传图片文件不能为空");
         }
-//        try {
-//            imageServiceHelper.uploadImageToGitee(file);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
         imageServiceHelper.uploadImageToGiteeAsync(file, sessionId);
         return ResultUtils.success(true);
     }
 
-//    @ApiOperation("获取首页帖子")
-//    @PostMapping("/listPost")
+    @ApiOperation("更新帖子")
+    @PostMapping("/updatePost")
+    public BaseResponse<Boolean> updatePost(@RequestBody PostUpdateRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "更新帖子餐宿不能为空");
+        }
+        boolean flag = postService.updatePost(request);
+        return ResultUtils.success(true);
+    }
+
+    @ApiOperation("删除帖子")
+    @PostMapping("/deletePost")
+    @AuthCheck
+    public BaseResponse<Boolean> deletePost(@RequestParam Long postId) {
+        if (ObjectUtil.isNull(postId)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        boolean flag = postService.deletePost(postId);
+        return ResultUtils.success(flag);
+    }
+
+//    @ApiOperation("获取自己帖子数据")
+//    @PostMapping("/listOwnPosts")
+//    @AuthCheck
+//    public BaseResponse<Boolean>
 
 }

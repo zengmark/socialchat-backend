@@ -22,6 +22,8 @@ import java.util.List;
 public class Post implements Serializable {
     //主键ID
     private Long id;
+    //爬虫来源ID
+    private String sourceId;
     //创建人ID
     private Long userId;
     //帖子标题

@@ -1,19 +1,21 @@
 package com.socialchat.controller;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.helper.ImageServiceHelper;
+import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -79,9 +81,15 @@ public class PostController {
         return ResultUtils.success(flag);
     }
 
-//    @ApiOperation("获取自己帖子数据")
-//    @PostMapping("/listOwnPosts")
-//    @AuthCheck
-//    public BaseResponse<Boolean>
+    @ApiOperation("获取自己帖子数据")
+    @PostMapping("/listOwnPosts")
+    @AuthCheck
+    public BaseResponse<Page<PostVO>> listOwnPosts(@RequestBody PostOwnRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        Page<PostVO> postVOPage = postService.listOwnPosts(request);
+        return ResultUtils.success(postVOPage);
+    }
 
 }

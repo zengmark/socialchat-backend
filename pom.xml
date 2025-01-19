@@ -15,7 +15,6 @@
         <module>socialchat-backend-common</module>
         <module>socialchat-backend-post-service</module>
         <module>socialchat-backend-comment-service</module>
-        <module>socialchat-backend-xxl-job-fetchdata</module>
     </modules>
 
     <properties>

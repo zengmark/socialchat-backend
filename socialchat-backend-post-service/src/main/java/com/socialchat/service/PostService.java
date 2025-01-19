@@ -1,9 +1,15 @@
 package com.socialchat.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.socialchat.model.dto.Record;
 import com.socialchat.model.entity.Post;
+import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostVO;
+
+import java.util.List;
 
 /**
  * (tb_post)表服务接口
@@ -22,6 +28,14 @@ public interface PostService extends IService<Post> {
     boolean savePost(PostSaveRequest request);
 
     /**
+     * 定时任务拉取帖子数据
+     *
+     * @param recordList
+     * @return
+     */
+    boolean savePostBySchedule(List<Record> recordList);
+
+    /**
      * 更新帖子
      *
      * @param request
@@ -36,5 +50,13 @@ public interface PostService extends IService<Post> {
      * @return
      */
     boolean deletePost(Long postId);
+
+    /**
+     * 获取自己帖子数据
+     *
+     * @param request
+     * @return
+     */
+    Page<PostVO> listOwnPosts(PostOwnRequest request);
 }
 

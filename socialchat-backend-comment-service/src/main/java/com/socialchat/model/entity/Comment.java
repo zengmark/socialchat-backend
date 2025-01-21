@@ -40,8 +40,6 @@ public class Comment implements Serializable {
     private String targetUserName;
     //被评论人头像链接
     private String targetUserAvatar;
-    //评论点赞数
-    private Integer likeNum;
     //创建时间
     private Date createTime;
     //更新时间

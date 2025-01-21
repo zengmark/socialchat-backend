@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.socialchat.api.UserRemoteService;
 import com.socialchat.common.ErrorCode;
+import com.socialchat.common.PageRequest;
+import com.socialchat.constant.PostConstant;
 import com.socialchat.dao.PostMapper;
 import com.socialchat.dao.PostTagRelationMapper;
 import com.socialchat.dao.VoteMapper;
@@ -21,7 +23,9 @@ import com.socialchat.model.entity.Vote;
 import com.socialchat.model.remote.user.UserDTO;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
 import com.socialchat.service.PostTagRelationService;
@@ -31,7 +35,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +47,10 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * (tb_post)表服务实现类
@@ -75,6 +85,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
 
     @Resource
     private PostTagRelationService postTagRelationService;
+
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
 
     private static int titleNumber = 1;
 
@@ -169,6 +182,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             post.setPostPictureList(pictureList);
             post.setVisible(0);
             postMapper.insert(post);
+            Long postId = post.getId();
 
             // 3、保存 tag 标签数据
             List<String> tagNameList = record.getTags();
@@ -180,7 +194,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             tagService.saveBatch(tagList);
 
             // 4、保存帖子标签关联表
-            Long postId = post.getId();
             List<PostTagRelation> postTagRelationList = tagList.stream().map(item -> {
                 PostTagRelation postTagRelation = new PostTagRelation();
                 postTagRelation.setPostId(postId);
@@ -199,7 +212,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             postSaveRequest.setVisible(0);
             postSaveRequest.setVoteRequest(null);
 
-            savePostToEs(postSaveRequest);
+            savePostToEs(postSaveRequest, postId);
 
         }
         return true;
@@ -291,32 +304,81 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         queryWrapper.eq(visible != null, Post::getVisible, visible);
         Page<Post> postPage = postMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
         List<Post> postList = postPage.getRecords();
-        List<PostVO> postVOList = postList.stream().map(post -> {
-            PostVO postVO = new PostVO();
-            postVO.setId(post.getId());
-            postVO.setUserId(post.getUserId());
-            postVO.setPostTitle(post.getPostTitle());
-            postVO.setPostContent(post.getPostContent());
-            postVO.setLikeNum(post.getLikeNum());
-            postVO.setCommentNum(post.getCommentNum());
-            postVO.setCollectNum(post.getCollectNum());
-            postVO.setVisible(post.getVisible());
-            postVO.setCreateTime(post.getCreateTime());
-            postVO.setUpdateTime(post.getUpdateTime());
-            postVO.setPostPictures(post.getPostPictureList());
-            postVO.setUserAt(post.getUserAtList());
-            return postVO;
-        }).collect(Collectors.toList());
+        List<PostVO> postVOList = postList.stream().map(PostServiceImpl::convertPostToPostVO).collect(Collectors.toList());
         Page<PostVO> postVOPage = new Page<>(current, pageSize);
         postVOPage.setRecords(postVOList);
 
         return postVOPage;
     }
 
+    @Override
+    public PostSearchPageVO listHomePosts(PageRequest request) {
+        int current = request.getCurrent();
+        int pageSize = request.getPageSize();
+        int start = (current - 1) * pageSize;
+        int end = current * pageSize - 1;
+        String sortField = request.getSortField();
+
+        PostSearchPageVO postSearchPageVO = new PostSearchPageVO();
+        postSearchPageVO.setCurrent(current);
+        postSearchPageVO.setSize(pageSize);
+
+        // 如果是查找热点数据
+        if (PostConstant.HOT.equals(sortField)) {
+            // 判断是否超过 es 的上限
+            if (start >= PostConstant.LIMIT) {
+                // todo：点赞数排序的逻辑，走降级逻辑，从 MySQL 中查询数据
+                LambdaQueryWrapper<Post> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.orderByDesc(Post::getCreateTime);
+                Page<Post> postPage = postMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
+                List<Post> postList = postPage.getRecords();
+                List<PostVO> postVOList = postList.stream().map(PostServiceImpl::convertPostToPostVO).collect(Collectors.toList());
+                postSearchPageVO.setRecords(postVOList);
+                postSearchPageVO.setTotal(postPage.getTotal());
+            } else {
+                // 先从 redis 中排序
+                Set<Object> postIdsSet = redisTemplate.opsForZSet().reverseRange(PostConstant.POST_HOT_KEY, start, end);
+
+                if (CollectionUtils.isEmpty(postIdsSet)) {
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "redis 中未查到帖子数据");
+                }
+
+                // 将 Set<Object> 转换为 Set<String>
+                Set<String> postIds = postIdsSet.stream()
+                        .map(postId -> postId + "")  // 转换为 String 类型
+                        .collect(Collectors.toSet());
+
+                // 根据 postIds 到 MySQL 中查询帖子
+                Iterable<PostDocument> postDocuments = postDocumentRepository.findAllById(postIds);
+                List<PostDocument> postDocumentList = StreamSupport.stream(postDocuments.spliterator(), false).collect(Collectors.toList());
+                postDocumentList.stream().map(postDocument -> {
+                    PostVO postVO = new PostVO();
+                    postVO.setId(Long.parseLong(postDocument.getId()));
+                    postVO.setUserId(postDocument.getUserId());
+                    postVO.setPostTitle(postDocument.getPostTitle());
+                    postVO.setPostContent(postDocument.getPostContent());
+                    postVO.setPostPictures(postDocument.getPostPictures());
+                    postVO.setUserAt(postDocument.getUserAt());
+//                    postVO.setLikeNum();
+//                    postVO.setCommentNum();
+//                    postVO.setCollectNum();
+//                    postVO.setVisible();
+//                    postVO.setCreateTime();
+//                    postVO.setUpdateTime();
+
+                    return postVO;
+                });
+            }
+        }
+
+        return null;
+    }
+
     // todo：保存到 ES，后期需要确定逻辑，目前只是一个架子，而且 Post 和 PostDocument 中的字段类型并不完全匹配
     //  （userAtList 和 pictureList），要记得做转换
-    private void savePostToEs(PostSaveRequest request) {
+    private void savePostToEs(PostSaveRequest request, Long postId) {
         PostDocument postDocument = new PostDocument();
+        postDocument.setId(postId + "");
         BeanUtils.copyProperties(request, postDocument);
         postDocument.setPostPictures(request.getPostPictureList());
         postDocument.setUserAt(request.getUserAtList());
@@ -334,6 +396,28 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     // todo：删除 ES 中的帖子数据
     private void deletePostToEs(Long postId) {
 
+    }
+
+    /**
+     * 将 Post 转换为 PostVO
+     *
+     * @param post
+     * @return
+     */
+    private static PostVO convertPostToPostVO(Post post) {
+        PostVO postVO = new PostVO();
+        postVO.setId(post.getId());
+        postVO.setUserId(post.getUserId());
+        postVO.setPostTitle(post.getPostTitle());
+        postVO.setPostContent(post.getPostContent());
+        postVO.setVisible(post.getVisible());
+        postVO.setCreateTime(post.getCreateTime());
+        postVO.setUpdateTime(post.getUpdateTime());
+        postVO.setPostPictures(post.getPostPictureList());
+        postVO.setUserAt(post.getUserAtList());
+
+        // 设置点赞数，评论数、收藏数
+        return postVO;
     }
 }
 

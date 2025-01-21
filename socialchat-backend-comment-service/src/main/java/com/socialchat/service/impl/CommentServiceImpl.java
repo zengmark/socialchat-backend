@@ -40,6 +40,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         int insert = commentMapper.insert(comment);
 
+        // todo：评论记录表添加评论记录
+
         // todo：后期引入消息表后要加事物控制并插入通知信息，并且使用 SSE 作服务端消息推送
 
         return insert > 0;
@@ -48,6 +50,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Override
     public boolean deleteComment(Long commentId) {
         int delete = commentMapper.deleteById(commentId);
+
+        // todo：评论记录表删除评论记录
 
         // todo：引入消息表，删除未读消息数据
 

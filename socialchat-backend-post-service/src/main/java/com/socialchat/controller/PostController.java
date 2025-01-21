@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
+import com.socialchat.common.PageRequest;
 import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.helper.ImageServiceHelper;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
 import io.swagger.annotations.Api;
@@ -89,6 +91,16 @@ public class PostController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
         }
         Page<PostVO> postVOPage = postService.listOwnPosts(request);
+        return ResultUtils.success(postVOPage);
+    }
+
+    @ApiOperation("获取首页帖子数据")
+    @PostMapping("/listHomePosts")
+    public BaseResponse<PostSearchPageVO> listHomePosts(@RequestBody PageRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        PostSearchPageVO postVOPage = postService.listHomePosts(request);
         return ResultUtils.success(postVOPage);
     }
 

@@ -42,24 +42,24 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
         List<CommentPostDTO> outsideCommentPostDTOList = commentOutsideList.stream()
                 .map(comment -> {
                     CommentPostDTO commentPostDTO = new CommentPostDTO();
+                    // todo：注意点赞字段设置
                     BeanUtils.copyProperties(comment, commentPostDTO);
 
-                    // 组装内层热门评论（只取前两个热门评论）
+                    // todo：从点赞表计数表里面取数据，组装内层热门评论（只取前两个热门评论）
                     Long commentId = commentPostDTO.getId();
-                    LambdaQueryWrapper<Comment> insideQueryWrapper = new LambdaQueryWrapper<>();
-                    insideQueryWrapper.eq(Comment::getTargetId, commentId);
-                    insideQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
-                    insideQueryWrapper.orderByDesc(Comment::getLikeNum).orderByDesc(Comment::getCreateTime);
-
-                    Page<Comment> commentInsidePage = commentMapper.selectPage(new Page<>(CommentConstant.HOT_START, CommentConstant.HOT_END), insideQueryWrapper);
-                    List<Comment> commentInsideList = CollectionUtils.isNotEmpty(commentInsidePage.getRecords()) ? commentInsidePage.getRecords() : new ArrayList<>();
-                    List<CommentPostDTO> insideCommentPostDTOList = commentInsideList.stream()
-                            .map(insideComment -> {
-                                CommentPostDTO insideCommentPostDTO = new CommentPostDTO();
-                                BeanUtils.copyProperties(insideComment, insideCommentPostDTO);
-                                return insideCommentPostDTO;
-                            }).collect(Collectors.toList());
-                    commentPostDTO.setBestCommentData(insideCommentPostDTOList);
+//                    LambdaQueryWrapper<Comment> insideQueryWrapper = new LambdaQueryWrapper<>();
+//                    insideQueryWrapper.eq(Comment::getTargetId, commentId);
+//                    insideQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
+//
+//                    Page<Comment> commentInsidePage = commentMapper.selectPage(new Page<>(CommentConstant.HOT_START, CommentConstant.HOT_END), insideQueryWrapper);
+//                    List<Comment> commentInsideList = CollectionUtils.isNotEmpty(commentInsidePage.getRecords()) ? commentInsidePage.getRecords() : new ArrayList<>();
+//                    List<CommentPostDTO> insideCommentPostDTOList = commentInsideList.stream()
+//                            .map(insideComment -> {
+//                                CommentPostDTO insideCommentPostDTO = new CommentPostDTO();
+//                                BeanUtils.copyProperties(insideComment, insideCommentPostDTO);
+//                                return insideCommentPostDTO;
+//                            }).collect(Collectors.toList());
+//                    commentPostDTO.setBestCommentData(insideCommentPostDTOList);
                     return commentPostDTO;
                 }).collect(Collectors.toList());
         Page<CommentPostDTO> outsideCommentPostDTOPage = new Page<>(current, pageSize);
@@ -82,6 +82,7 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
         List<Comment> commentList = CollectionUtils.isNotEmpty(commentPage.getRecords()) ? commentPage.getRecords() : new ArrayList<>();
         List<CommentPostDTO> commentPostDTOList = commentList.stream()
                 .map(comment -> {
+                    // todo：注意点赞数设置
                     CommentPostDTO commentPostDTO = new CommentPostDTO();
                     BeanUtils.copyProperties(comment, commentPostDTO);
                     return commentPostDTO;

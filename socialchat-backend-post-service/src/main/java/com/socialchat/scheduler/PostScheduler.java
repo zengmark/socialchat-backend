@@ -59,7 +59,7 @@ public class PostScheduler implements CommandLineRunner {
 
             MediaType mediaType = MediaType.parse("application/json; charset=utf-8");
             String requestJSONTemplate = "{\"pageSize\":20,\"sortOrder\":\"descend\",\"sortField\":\"createTime\",\"tags\":[],\"current\":%d,\"reviewStatus\":1}";
-            int current = 1;
+            int current = 798;
             while (true) {
                 // 构造本次请求请求体
                 String requestJSON = String.format(requestJSONTemplate, current);

@@ -2,11 +2,13 @@ package com.socialchat.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.socialchat.common.PageRequest;
 import com.socialchat.model.dto.Record;
 import com.socialchat.model.entity.Post;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
 
 import java.util.List;
@@ -58,5 +60,13 @@ public interface PostService extends IService<Post> {
      * @return
      */
     Page<PostVO> listOwnPosts(PostOwnRequest request);
+
+    /**
+     * 获取首页帖子数据
+     *
+     * @param request
+     * @return
+     */
+    PostSearchPageVO listHomePosts(PageRequest request);
 }
 

@@ -1,7 +1,7 @@
 package com.socialchat.dao;
 
-import com.socialchat.model.entity.CollectCount;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.socialchat.model.entity.CollectCount;
 
 /**
 * @author macbookpro

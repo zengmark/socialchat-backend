@@ -43,6 +43,7 @@ public class Comment implements Serializable {
     //创建时间
     private Date createTime;
     //更新时间
+    @TableField(value = "update_time", update = "now()")
     private Date updateTime;
     //软删除标记
     private Integer isDeleted;

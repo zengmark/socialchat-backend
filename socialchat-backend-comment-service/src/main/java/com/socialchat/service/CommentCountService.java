@@ -1,7 +1,7 @@
 package com.socialchat.service;
 
-import com.socialchat.model.entity.CommentCount;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.socialchat.model.entity.CommentCount;
 
 /**
 * @author macbookpro

@@ -23,7 +23,6 @@ import com.socialchat.model.entity.Vote;
 import com.socialchat.model.remote.user.UserDTO;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
-import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
@@ -35,10 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,7 +128,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         }
 
         // 3、插入帖子标签关联
-
 
         // todo：如果是所有人可见，即 visible 为 0 的时候，需要同步数据到 es 中
 
@@ -384,6 +379,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         postDocument.setUserAt(request.getUserAtList());
         postDocument.setCreateTime(new Date());
         postDocument.setUpdateTime(new Date());
+        postDocument.setLikeNum(0);
 
         postDocumentRepository.save(postDocument);
     }

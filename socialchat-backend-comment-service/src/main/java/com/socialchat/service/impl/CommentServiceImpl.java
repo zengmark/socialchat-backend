@@ -40,7 +40,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 
         int insert = commentMapper.insert(comment);
 
-        // todo：评论记录表添加评论记录
+        // todo：评论记录表添加评论记录以及评论计数表插入评论计数
 
         // todo：后期引入消息表后要加事物控制并插入通知信息，并且使用 SSE 作服务端消息推送
 

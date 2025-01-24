@@ -1,9 +1,9 @@
 package com.socialchat.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.socialchat.dao.LikeCountMapper;
 import com.socialchat.model.entity.LikeCount;
 import com.socialchat.service.LikeCountService;
-import com.socialchat.dao.LikeCountMapper;
 import org.springframework.stereotype.Service;
 
 /**

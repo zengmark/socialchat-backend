@@ -16,7 +16,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
 @EnableKnife4j
 public class SwaggerConfig {
 
-    @Bean(value = "userApi")
+    @Bean(value = "postApi")
     public Docket groupRestApi() {
         return new Docket(DocumentationType.SWAGGER_2)
                 .apiInfo(groupApiInfo())

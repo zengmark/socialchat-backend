@@ -31,6 +31,15 @@ public class PostDocument {
     @Field(type = FieldType.Keyword)
     private List<Long> userAt; // @用户的id数组
 
+    @Field(type = FieldType.Integer)
+    private Integer likeNum; // 点赞数
+
+//    @Field(type = FieldType.Integer)
+//    private Integer commentNum; // 评论数
+//
+//    @Field(type = FieldType.Integer)
+//    private Integer collectNum; // 收藏数
+
     @Field(type = FieldType.Date)
     private Date createTime; // 创建时间
 

@@ -16,7 +16,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
 @EnableKnife4j
 public class SwaggerConfig {
 
-    @Bean(value = "userApi")
+    @Bean(value = "commentApi")
     public Docket groupRestApi() {
         return new Docket(DocumentationType.SWAGGER_2)
                 .apiInfo(groupApiInfo())
@@ -28,7 +28,7 @@ public class SwaggerConfig {
 
     private ApiInfo groupApiInfo() {
         return new ApiInfoBuilder()
-                .title("用户模块")
+                .title("评论模块")
                 .description("<div style='font-size:14px;color:red;'>swagger-bootstrap-ui-demo RESTful APIs</div>")
                 .termsOfServiceUrl("https://github.com/zengmark")
                 .contact("1312320323@qq.com")

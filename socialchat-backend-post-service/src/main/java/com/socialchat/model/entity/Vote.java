@@ -1,5 +1,6 @@
 package com.socialchat.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -31,6 +32,7 @@ public class Vote {
     //创建时间
     private Date createTime;
     //更新时间
+    @TableField(value = "update_time", update = "now()")
     private Date updateTime;
     //软删除标记
     private Integer isDeleted;

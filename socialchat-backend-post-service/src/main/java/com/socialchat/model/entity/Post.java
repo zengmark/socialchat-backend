@@ -34,12 +34,6 @@ public class Post implements Serializable {
     private String postPictures;
     //@用户的id数组
     private String userAt;
-    //点赞数
-    private Integer likeNum;
-    //评论数
-    private Integer commentNum;
-    //收藏数
-    private Integer collectNum;
     //是否可见
     private Integer visible;
     //创建时间

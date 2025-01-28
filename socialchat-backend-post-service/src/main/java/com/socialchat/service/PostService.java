@@ -7,6 +7,7 @@ import com.socialchat.model.dto.Record;
 import com.socialchat.model.entity.Post;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
@@ -68,5 +69,13 @@ public interface PostService extends IService<Post> {
      * @return
      */
     PostSearchPageVO listHomePosts(PageRequest request);
+
+    /**
+     * 根据搜索词、标签获取帖子数据
+     *
+     * @param request
+     * @return
+     */
+    PostSearchPageVO listSearchPosts(PostSearchRequest request);
 }
 

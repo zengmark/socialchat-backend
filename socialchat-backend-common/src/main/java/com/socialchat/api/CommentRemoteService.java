@@ -24,4 +24,12 @@ public interface CommentRemoteService {
      * @return
      */
     Page<CommentPostDTO> listCommentUnderComment(Long commentId, Long current, Long pageSize);
+
+    /**
+     * 获取帖子下的评论数量
+     *
+     * @param postId
+     * @return
+     */
+    Integer countCommentByPostId(Long postId);
 }

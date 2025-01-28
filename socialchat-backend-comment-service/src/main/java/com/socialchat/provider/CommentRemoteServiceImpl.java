@@ -3,12 +3,16 @@ package com.socialchat.provider;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.api.CommentRemoteService;
+import com.socialchat.api.LikeRemoteService;
 import com.socialchat.constant.CommentConstant;
+import com.socialchat.dao.CommentCountMapper;
 import com.socialchat.dao.CommentMapper;
 import com.socialchat.model.entity.Comment;
+import com.socialchat.model.entity.CommentCount;
 import com.socialchat.model.remote.comment.CommentPostDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.beans.BeanUtils;
 
@@ -23,6 +27,12 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
 
     @Resource
     private CommentMapper commentMapper;
+
+    @Resource
+    private CommentCountMapper commentCountMapper;
+
+    @DubboReference
+    private LikeRemoteService likeRemoteService;
 
     @Override
     public Page<CommentPostDTO> listCommentUnderPost(Long postId, Long current, Long pageSize) {
@@ -42,24 +52,29 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
         List<CommentPostDTO> outsideCommentPostDTOList = commentOutsideList.stream()
                 .map(comment -> {
                     CommentPostDTO commentPostDTO = new CommentPostDTO();
-                    // todo：注意点赞字段设置
                     BeanUtils.copyProperties(comment, commentPostDTO);
+                    // 点赞数字段设置
+                    Integer outsideLikeNum = likeRemoteService.countLikeByTargetIdAndTargetType(comment.getId(), CommentConstant.COMMENT);
+                    commentPostDTO.setLikeNum(outsideLikeNum);
 
-                    // todo：从点赞表计数表里面取数据，组装内层热门评论（只取前两个热门评论）
-                    Long commentId = commentPostDTO.getId();
-//                    LambdaQueryWrapper<Comment> insideQueryWrapper = new LambdaQueryWrapper<>();
-//                    insideQueryWrapper.eq(Comment::getTargetId, commentId);
-//                    insideQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
-//
-//                    Page<Comment> commentInsidePage = commentMapper.selectPage(new Page<>(CommentConstant.HOT_START, CommentConstant.HOT_END), insideQueryWrapper);
-//                    List<Comment> commentInsideList = CollectionUtils.isNotEmpty(commentInsidePage.getRecords()) ? commentInsidePage.getRecords() : new ArrayList<>();
-//                    List<CommentPostDTO> insideCommentPostDTOList = commentInsideList.stream()
-//                            .map(insideComment -> {
-//                                CommentPostDTO insideCommentPostDTO = new CommentPostDTO();
-//                                BeanUtils.copyProperties(insideComment, insideCommentPostDTO);
-//                                return insideCommentPostDTO;
-//                            }).collect(Collectors.toList());
-//                    commentPostDTO.setBestCommentData(insideCommentPostDTOList);
+                    // 组装内层评论
+                    Long commentId = comment.getId();
+                    LambdaQueryWrapper<Comment> insideQueryWrapper = new LambdaQueryWrapper<>();
+                    insideQueryWrapper.eq(Comment::getParentId, commentId);
+                    insideQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
+
+                    Page<Comment> commentInsidePage = commentMapper.selectPage(new Page<>(1, 10), insideQueryWrapper);
+                    List<Comment> commentInsideList = CollectionUtils.isNotEmpty(commentInsidePage.getRecords()) ? commentInsidePage.getRecords() : new ArrayList<>();
+                    List<CommentPostDTO> insideCommentPostDTOList = commentInsideList.parallelStream()
+                            .map(insideComment -> {
+                                CommentPostDTO insideCommentPostDTO = new CommentPostDTO();
+                                BeanUtils.copyProperties(insideComment, insideCommentPostDTO);
+                                // 点赞数字段设置
+                                Integer insideLikeNum = likeRemoteService.countLikeByTargetIdAndTargetType(insideComment.getId(), CommentConstant.COMMENT);
+                                commentPostDTO.setLikeNum(insideLikeNum);
+                                return insideCommentPostDTO;
+                            }).collect(Collectors.toList());
+                    commentPostDTO.setBestCommentData(insideCommentPostDTOList);
                     return commentPostDTO;
                 }).collect(Collectors.toList());
         Page<CommentPostDTO> outsideCommentPostDTOPage = new Page<>(current, pageSize);
@@ -74,21 +89,38 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
 
         // 根据 commentId 获取这个评论下的评论数据
         LambdaQueryWrapper<Comment> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Comment::getTargetId, commentId);
+        queryWrapper.eq(Comment::getParentId, commentId);
         queryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
         queryWrapper.orderByDesc(Comment::getCreateTime);
 
         Page<Comment> commentPage = commentMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
         List<Comment> commentList = CollectionUtils.isNotEmpty(commentPage.getRecords()) ? commentPage.getRecords() : new ArrayList<>();
-        List<CommentPostDTO> commentPostDTOList = commentList.stream()
+        List<CommentPostDTO> commentPostDTOList = commentList.parallelStream()
                 .map(comment -> {
-                    // todo：注意点赞数设置
                     CommentPostDTO commentPostDTO = new CommentPostDTO();
                     BeanUtils.copyProperties(comment, commentPostDTO);
+                    // 设置点赞数
+                    Integer likeNum = likeRemoteService.countLikeByTargetIdAndTargetType(comment.getId(), CommentConstant.COMMENT);
+                    commentPostDTO.setLikeNum(likeNum);
                     return commentPostDTO;
                 }).collect(Collectors.toList());
         Page<CommentPostDTO> commentPostDTOPage = new Page<>(current, pageSize);
         commentPostDTOPage.setRecords(commentPostDTOList);
         return commentPostDTOPage;
+    }
+
+    @Override
+    public Integer countCommentByPostId(Long postId) {
+        log.info("获取帖子ID为{}下的评论数", postId);
+
+        LambdaQueryWrapper<CommentCount> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CommentCount::getTargetId, postId);
+        queryWrapper.eq(CommentCount::getTargetType, CommentConstant.POST);
+        CommentCount commentCount = commentCountMapper.selectOne(queryWrapper);
+        if (commentCount == null) {
+            return 0;
+        }
+
+        return commentCount.getCommentNum();
     }
 }

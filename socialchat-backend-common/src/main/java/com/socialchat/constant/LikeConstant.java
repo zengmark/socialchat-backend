@@ -1,5 +1,8 @@
 package com.socialchat.constant;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 public interface LikeConstant {
 
     Integer LIKE = 0;
@@ -18,8 +21,6 @@ public interface LikeConstant {
 
     Long MAX_LIKE_RECORD_LENGTH = 1000L;
 
-    Integer MAX_LIKE_RETRIES = 3;
-
     Integer LIKE_THRESHOLD = 10;
 
     Integer POST_TYPE = 0;
@@ -30,4 +31,13 @@ public interface LikeConstant {
 
     Integer LIKE_PAGE_SIZE = 100;
 
+    String LIKE_NUM = "likeNum";
+
+    Integer MAX_LIKE_RETRIES = 3;
+
+    Long LIKE_TIME_INTERVAL = 200L;
+
+    TimeUnit TIME_UNIT = TimeUnit.MICROSECONDS;
+
+    Duration LIKE_LOCK_EXPIRE_TIME = Duration.ofSeconds(10);
 }

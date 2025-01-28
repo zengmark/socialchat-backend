@@ -17,6 +17,8 @@ public class CommentAddRequest implements Serializable {
 
     private Long postId;
 
+    private Long parentId;
+
     private Integer targetType;
 
     private Long targetId;

@@ -5,12 +5,18 @@ import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.socialchat.api.CollectRemoteService;
+import com.socialchat.api.CommentRemoteService;
+import com.socialchat.api.LikeRemoteService;
 import com.socialchat.api.UserRemoteService;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.PageRequest;
+import com.socialchat.constant.CollectConstant;
+import com.socialchat.constant.LikeConstant;
 import com.socialchat.constant.PostConstant;
 import com.socialchat.dao.PostMapper;
 import com.socialchat.dao.PostTagRelationMapper;
+import com.socialchat.dao.TagMapper;
 import com.socialchat.dao.VoteMapper;
 import com.socialchat.es.document.PostDocument;
 import com.socialchat.es.repository.PostDocumentRepository;
@@ -23,6 +29,7 @@ import com.socialchat.model.entity.Vote;
 import com.socialchat.model.remote.user.UserDTO;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
@@ -34,19 +41,32 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.ScriptQueryBuilder;
+import org.elasticsearch.script.Script;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * (tb_post)表服务实现类
@@ -61,6 +81,15 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     @DubboReference
     private UserRemoteService userRemoteService;
 
+    @DubboReference
+    private CommentRemoteService commentRemoteService;
+
+    @DubboReference
+    private LikeRemoteService likeRemoteService;
+
+    @DubboReference
+    private CollectRemoteService collectRemoteService;
+
     @Resource
     private PostMapper postMapper;
 
@@ -74,7 +103,13 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     private PostDocumentRepository postDocumentRepository;
 
     @Resource
+    private ElasticsearchRestTemplate elasticsearchRestTemplate;
+
+    @Resource
     private VoteMapper voteMapper;
+
+    @Resource
+    private TagMapper tagMapper;
 
     @Resource
     private TagService tagService;
@@ -98,6 +133,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         List<Long> userAtList = CollectionUtils.isEmpty(request.getUserAtList()) ? new ArrayList<>() : request.getUserAtList();
         Integer visible = request.getVisible();
         PostSaveRequest.VoteRequest voteRequest = request.getVoteRequest();
+        List<Long> tagIds = request.getTagIds();
 
         // 1、插入帖子
         Post post = new Post();
@@ -108,12 +144,12 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         post.setVisible(visible);
         post.setUserAtList(userAtList);
         int insert = postMapper.insert(post);
+        Long postId = post.getId();
 
         // 2、插入投票项
         if (ObjectUtil.isNotNull(voteRequest) && voteRequest.getHasVote()) {
             String voteTitle = voteRequest.getVoteTitle();
             List<String> voteItemList = voteRequest.getVoteItemList();
-            Long postId = post.getId();
 
             List<Vote> voteList = voteItemList.stream().map(content -> {
                 Vote vote = new Vote();
@@ -128,9 +164,20 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         }
 
         // 3、插入帖子标签关联
+        if (CollectionUtils.isNotEmpty(tagIds)) {
+            List<PostTagRelation> postTagRelationList = tagIds.stream().map(tagId -> {
+                PostTagRelation postTagRelation = new PostTagRelation();
+                postTagRelation.setPostId(postId);
+                postTagRelation.setTagId(tagId);
+                return postTagRelation;
+            }).collect(Collectors.toList());
+            postTagRelationService.saveBatch(postTagRelationList);
+        }
 
-        // todo：如果是所有人可见，即 visible 为 0 的时候，需要同步数据到 es 中
-
+        // 4、如果是所有人可见，即 visible 为 0 的时候，需要同步数据到 es 中
+        if (PostConstant.ALL_PEOPLE.equals(visible)) {
+            savePostToEs(request, postId);
+        }
 
         return insert > 0;
     }
@@ -205,6 +252,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             postSaveRequest.setPostPictureList(pictureList);
             postSaveRequest.setUserAtList(null);
             postSaveRequest.setVisible(0);
+            postSaveRequest.setTags(tagNameList);
             postSaveRequest.setVoteRequest(null);
 
             savePostToEs(postSaveRequest, postId);
@@ -231,7 +279,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         List<Long> userAtList = request.getUserAtList();
         Integer visible = request.getVisible();
         PostSaveRequest.VoteRequest voteRequest = request.getVoteRequest();
+        List<Long> tagIds = request.getTagIds();
 
+        // 1、更新数据库中的帖子数据
         post.setPostTitle(postTitle);
         post.setPostContent(postContent);
         post.setPostPictureList(postPictureList);
@@ -239,10 +289,11 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         post.setVisible(visible);
         postMapper.updateById(post);
 
+        // 2、更新数据库中的投票项数据
         // 先删除过去的 vote 投票项
-        LambdaQueryWrapper<Vote> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Vote::getPostId, postId);
-        voteService.remove(queryWrapper);
+        LambdaQueryWrapper<Vote> voteLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        voteLambdaQueryWrapper.eq(Vote::getPostId, postId);
+        voteService.remove(voteLambdaQueryWrapper);
 
         // 更新投票项
         if (ObjectUtil.isNotNull(voteRequest) && voteRequest.getHasVote()) {
@@ -261,7 +312,32 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             voteService.saveBatch(voteList);
         }
 
+        // 3、更新数据库中的帖子标签关联项数据
+        // 删除帖子标签关联项
+        LambdaQueryWrapper<PostTagRelation> postTagRelationLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        postTagRelationLambdaQueryWrapper.eq(PostTagRelation::getPostId, postId);
+        postTagRelationService.remove(postTagRelationLambdaQueryWrapper);
+
+        // 更新帖子标签关联项
+        if (CollectionUtils.isNotEmpty(tagIds)) {
+            List<PostTagRelation> postTagRelationList = tagIds.stream().map(tagId -> {
+                PostTagRelation postTagRelation = new PostTagRelation();
+                postTagRelation.setPostId(postId);
+                postTagRelation.setTagId(tagId);
+                return postTagRelation;
+            }).collect(Collectors.toList());
+            postTagRelationService.saveBatch(postTagRelationList);
+        }
+
+        // 4、更新 es 中的帖子投票项数据
         // 更新 ES 中的帖子数据
+        if (PostConstant.ALL_PEOPLE.equals(visible)) {
+            // 保存 post 到 ES
+            savePostToEs(request, postId);
+        } else if(PostConstant.HIDE.equals(visible)) {
+            // 删除 es 中对应的 post
+            postDocumentRepository.deleteById(String.valueOf(postId));
+        }
 
         return true;
     }
@@ -277,12 +353,13 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         voteQueryWrapper.eq(Vote::getPostId, postId);
         voteMapper.delete(voteQueryWrapper);
 
-        // 3、删除帖子和标签绑定关系
+        // 3、删除帖子和标签关联项
         LambdaQueryWrapper<PostTagRelation> postTagRelationQueryWrapper = new LambdaQueryWrapper<>();
         postTagRelationQueryWrapper.eq(PostTagRelation::getPostId, postId);
         postTagRelationMapper.delete(postTagRelationQueryWrapper);
 
-        // todo：删除 ES 中的帖子数据
+        // 4、删除 ES 中的帖子数据
+        postDocumentRepository.deleteById(String.valueOf(postId));
 
         return delete > 0;
     }
@@ -296,10 +373,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
 
         LambdaQueryWrapper<Post> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Post::getUserId, userId);
-        queryWrapper.eq(visible != null, Post::getVisible, visible);
+        queryWrapper.eq(Post::getVisible, visible);
         Page<Post> postPage = postMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
         List<Post> postList = postPage.getRecords();
-        List<PostVO> postVOList = postList.stream().map(PostServiceImpl::convertPostToPostVO).collect(Collectors.toList());
+        List<PostVO> postVOList = postList.stream().map(this::convertPostToPostVO).collect(Collectors.toList());
         Page<PostVO> postVOPage = new Page<>(current, pageSize);
         postVOPage.setRecords(postVOList);
 
@@ -311,7 +388,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         int current = request.getCurrent();
         int pageSize = request.getPageSize();
         int start = (current - 1) * pageSize;
-        int end = current * pageSize - 1;
         String sortField = request.getSortField();
 
         PostSearchPageVO postSearchPageVO = new PostSearchPageVO();
@@ -322,65 +398,202 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         if (PostConstant.HOT.equals(sortField)) {
             // 判断是否超过 es 的上限
             if (start >= PostConstant.LIMIT) {
-                // todo：点赞数排序的逻辑，走降级逻辑，从 MySQL 中查询数据
+                // 从点赞服务获取帖子ID
+                List<Long> postIdList = likeRemoteService.listPostIdByLikeNum(current, pageSize);
+
+                // 根据帖子ID，从 MySQL 中查询数据
                 LambdaQueryWrapper<Post> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.in(Post::getId, postIdList);
+                queryWrapper.eq(Post::getVisible, PostConstant.ALL_PEOPLE);
                 queryWrapper.orderByDesc(Post::getCreateTime);
-                Page<Post> postPage = postMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
-                List<Post> postList = postPage.getRecords();
-                List<PostVO> postVOList = postList.stream().map(PostServiceImpl::convertPostToPostVO).collect(Collectors.toList());
+                List<Post> postList = postMapper.selectList(queryWrapper);
+                List<PostVO> postVOList = postList.stream().map(this::convertPostToPostVO).collect(Collectors.toList());
+
+                // 查出总数，组装结果
+                queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(Post::getVisible, PostConstant.ALL_PEOPLE);
+                Long total = postMapper.selectCount(queryWrapper);
                 postSearchPageVO.setRecords(postVOList);
-                postSearchPageVO.setTotal(postPage.getTotal());
+                postSearchPageVO.setTotal(total);
             } else {
-                // 先从 redis 中排序
-                Set<Object> postIdsSet = redisTemplate.opsForZSet().reverseRange(PostConstant.POST_HOT_KEY, start, end);
+                // 从 ES 中直接查询帖子数据
+                Sort likeSort = Sort.by(Sort.Direction.DESC, LikeConstant.LIKE_NUM);
+                org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(current - 1, pageSize, likeSort);
+                org.springframework.data.domain.Page<PostDocument> postDocumentPage = postDocumentRepository.findAll(pageRequest);
+                List<PostDocument> postDocumentList = postDocumentPage.getContent();
+                long total = postDocumentPage.getTotalElements();
 
-                if (CollectionUtils.isEmpty(postIdsSet)) {
-                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "redis 中未查到帖子数据");
-                }
+                List<PostVO> postVOList = postDocumentList.stream().map(this::convertPostDocumentToPostVO).collect(Collectors.toList());
+                postSearchPageVO.setRecords(postVOList);
+                postSearchPageVO.setTotal(total);
+            }
+        } else {
+            // 判断是否超过 es 的上限
+            if (start >= PostConstant.LIMIT) {
+                // 根据帖子ID，从 MySQL 中查询数据
+                LambdaQueryWrapper<Post> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(Post::getVisible, PostConstant.ALL_PEOPLE);
+                queryWrapper.orderByDesc(Post::getCreateTime);
+                List<Post> postList = postMapper.selectList(queryWrapper);
+                List<PostVO> postVOList = postList.stream().map(this::convertPostToPostVO).collect(Collectors.toList());
 
-                // 将 Set<Object> 转换为 Set<String>
-                Set<String> postIds = postIdsSet.stream()
-                        .map(postId -> postId + "")  // 转换为 String 类型
-                        .collect(Collectors.toSet());
+                // 查出总数，组装结果
+                queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(Post::getVisible, PostConstant.ALL_PEOPLE);
+                Long total = postMapper.selectCount(queryWrapper);
+                postSearchPageVO.setRecords(postVOList);
+                postSearchPageVO.setTotal(total);
+            } else {
+                // 从 ES 中直接查询帖子数据
+                org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(current - 1, pageSize);
+                org.springframework.data.domain.Page<PostDocument> postDocumentPage = postDocumentRepository.findAllByOrderByCreateTimeDesc(pageRequest);
+                List<PostDocument> postDocumentList = postDocumentPage.getContent();
+                long total = postDocumentPage.getTotalElements();
 
-                // 根据 postIds 到 MySQL 中查询帖子
-                Iterable<PostDocument> postDocuments = postDocumentRepository.findAllById(postIds);
-                List<PostDocument> postDocumentList = StreamSupport.stream(postDocuments.spliterator(), false).collect(Collectors.toList());
-                postDocumentList.stream().map(postDocument -> {
-                    PostVO postVO = new PostVO();
-                    postVO.setId(Long.parseLong(postDocument.getId()));
-                    postVO.setUserId(postDocument.getUserId());
-                    postVO.setPostTitle(postDocument.getPostTitle());
-                    postVO.setPostContent(postDocument.getPostContent());
-                    postVO.setPostPictures(postDocument.getPostPictures());
-                    postVO.setUserAt(postDocument.getUserAt());
-//                    postVO.setLikeNum();
-//                    postVO.setCommentNum();
-//                    postVO.setCollectNum();
-//                    postVO.setVisible();
-//                    postVO.setCreateTime();
-//                    postVO.setUpdateTime();
-
-                    return postVO;
-                });
+                List<PostVO> postVOList = postDocumentList.stream().map(this::convertPostDocumentToPostVO).collect(Collectors.toList());
+                postSearchPageVO.setRecords(postVOList);
+                postSearchPageVO.setTotal(total);
             }
         }
-
-        return null;
+        return postSearchPageVO;
     }
 
-    // todo：保存到 ES，后期需要确定逻辑，目前只是一个架子，而且 Post 和 PostDocument 中的字段类型并不完全匹配
-    //  （userAtList 和 pictureList），要记得做转换
+    @Override
+    public PostSearchPageVO listSearchPosts(PostSearchRequest request) {
+        String searchWord = request.getSearchWord();
+        List<String> tagList = request.getTagList();
+        int current = request.getCurrent();
+        int pageSize = request.getPageSize();
+        int start = (current - 1) * pageSize;
+        String sortField = request.getSortField();
+
+        if (StringUtils.isBlank(searchWord)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "搜索词不能为空");
+        }
+
+        // 判断是否超过 es 的上限
+        if (start >= PostConstant.LIMIT) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "您已经滑到底了，无法展示更多数据");
+        }
+
+        PostSearchPageVO postSearchPageVO = new PostSearchPageVO();
+        postSearchPageVO.setCurrent(current);
+        postSearchPageVO.setSize(pageSize);
+
+        // 如果是查找热点数据
+        Sort sort;
+        if (PostConstant.HOT.equals(sortField)) {
+            sort = Sort.by(Sort.Order.desc(LikeConstant.LIKE_NUM), Sort.Order.desc(PostConstant.CREATE_TIME));
+        } else {
+            sort = Sort.by(Sort.Order.desc(PostConstant.CREATE_TIME));
+        }
+
+        org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(current - 1, pageSize, sort);
+        org.springframework.data.domain.Page<PostDocument> postDocumentPage;
+        List<PostDocument> postDocumentList;
+        long total;
+        // 如果标签项不为空
+        if (CollectionUtils.isNotEmpty(tagList)) {
+//            postDocumentPage = postDocumentRepository.findByPostTitleContainingOrPostContentContainingAndTagsIn(searchWord, searchWord, tagList, pageRequest);
+            PageImpl<PostDocument> postDocumentPageImpl = searchPosts(searchWord, tagList, current, pageSize);
+            postDocumentList = postDocumentPageImpl.getContent();
+            total = postDocumentPageImpl.getTotalElements();
+        } else {
+            postDocumentPage = postDocumentRepository.findByPostTitleContainingOrPostContentContaining(searchWord, searchWord, pageRequest);
+            postDocumentList = postDocumentPage.getContent();
+            total = postDocumentPage.getTotalElements();
+        }
+
+//        postDocumentList = postDocumentPage.getContent();
+//        long total = postDocumentPage.getTotalElements();
+        List<PostVO> postVOList = postDocumentList.stream().map(this::convertPostDocumentToPostVO).collect(Collectors.toList());
+        postSearchPageVO.setRecords(postVOList);
+        postSearchPageVO.setTotal(total);
+
+        return postSearchPageVO;
+    }
+
+    public PageImpl<PostDocument> searchPosts(String keyword, List<String> tagNames, int current, int pageSize) {
+        Pageable pageable = Pageable.ofSize(pageSize).withPage(current - 1);
+
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+
+        // 构建标题和内容的OR条件
+        BoolQueryBuilder titleContentQuery = QueryBuilders.boolQuery();
+        titleContentQuery.should(QueryBuilders.matchQuery("postTitle", keyword));
+        titleContentQuery.should(QueryBuilders.matchQuery("postContent", keyword));
+        boolQuery.must(titleContentQuery);
+
+        // 如果tags不为空，添加tags的匹配条件
+        if (tagNames != null && !tagNames.isEmpty()) {
+            boolQuery.must(QueryBuilders.termsQuery("tags", tagNames));
+        }
+
+        NativeSearchQuery searchQuery = new NativeSearchQuery(boolQuery);
+        searchQuery.setPageable(pageable);
+
+        SearchHits<PostDocument> searchHits = elasticsearchRestTemplate.search(searchQuery, PostDocument.class);
+        List<PostDocument> results = searchHits.stream()
+                .map(SearchHit::getContent)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(results, pageable, searchHits.getTotalHits());
+
+//        NativeSearchQueryBuilder queryBuilder = new NativeSearchQueryBuilder();
+//
+//        // 构建 must 部分
+//        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery();
+//        // 添加 should 条件
+//        BoolQueryBuilder shouldQueryBuilder = QueryBuilders.boolQuery();
+//        shouldQueryBuilder.should(QueryBuilders.matchQuery("postTitle", keyword));
+//        shouldQueryBuilder.should(QueryBuilders.matchQuery("postContent", keyword));
+//        boolQueryBuilder.must(shouldQueryBuilder);
+//
+//
+//        // 使用脚本查询
+//        if (tagNames != null && !tagNames.isEmpty()) {
+//            Script script = new Script(
+//                    Script.DEFAULT_SCRIPT_TYPE,
+//                    Script.DEFAULT_SCRIPT_LANG,
+//                    "doc['tags'].stream().anyMatch(s -> params.tagNames.contains(s))",
+//                    Collections.singletonMap("tagNames", tagNames)
+//            );
+//            ScriptQueryBuilder scriptQueryBuilder = QueryBuilders.scriptQuery(script);
+//            boolQueryBuilder.must(scriptQueryBuilder);
+//
+//            Script filterScript = new Script(
+//                    Script.DEFAULT_SCRIPT_TYPE,
+//                    Script.DEFAULT_SCRIPT_LANG,
+//                    "params.tagNames.size() > 0 ? true : doc['tags'].size() > 0",
+//                    Collections.singletonMap("tagNames", tagNames)
+//            );
+//            ScriptQueryBuilder filterQueryBuilder = QueryBuilders.scriptQuery(filterScript);
+//            queryBuilder.withFilter(filterQueryBuilder);
+//        } else {
+//            // 如果没有标签，则不需要过滤，但是为了不报错，添加一个空filter
+//            queryBuilder.withFilter(QueryBuilders.existsQuery("tags"));
+//        }
+//
+//        queryBuilder.withQuery(boolQueryBuilder);
+//        NativeSearchQuery searchQuery = queryBuilder.withPageable(pageable).build();
+//
+//        SearchHits<PostDocument> searchHits = elasticsearchRestTemplate.search(searchQuery, PostDocument.class);
+//        List<PostDocument> postDocuments = searchHits.stream().map(SearchHit::getContent).collect(Collectors.toList());
+//        long totalHits = searchHits.getTotalHits();
+//        return new PageImpl<>(postDocuments, pageable, totalHits);
+    }
+
+    // 保存到 ES， Post 和 PostDocument 中的字段类型并不完全匹配（userAtList 和 pictureList），要记得做转换
     private void savePostToEs(PostSaveRequest request, Long postId) {
         PostDocument postDocument = new PostDocument();
-        postDocument.setId(postId + "");
         BeanUtils.copyProperties(request, postDocument);
+        postDocument.setId(String.valueOf(postId));
         postDocument.setPostPictures(request.getPostPictureList());
         postDocument.setUserAt(request.getUserAtList());
         postDocument.setCreateTime(new Date());
         postDocument.setUpdateTime(new Date());
         postDocument.setLikeNum(0);
-
+        postDocument.setTags(request.getTags());
         postDocumentRepository.save(postDocument);
     }
 
@@ -400,7 +613,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
      * @param post
      * @return
      */
-    private static PostVO convertPostToPostVO(Post post) {
+    private PostVO convertPostToPostVO(Post post) {
         PostVO postVO = new PostVO();
         postVO.setId(post.getId());
         postVO.setUserId(post.getUserId());
@@ -412,7 +625,54 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         postVO.setPostPictures(post.getPostPictureList());
         postVO.setUserAt(post.getUserAtList());
 
-        // 设置点赞数，评论数、收藏数
+        // 设置评论数、收藏数、tag 标签
+        Long postId = post.getId();
+        CompletableFuture<Void> commentNumFuture = CompletableFuture.runAsync(() -> {
+            Integer commentNum = commentRemoteService.countCommentByPostId(postId);
+            postVO.setCommentNum(commentNum);
+        });
+        CompletableFuture<Void> collectNumFuture = CompletableFuture.runAsync(() -> {
+            Integer collectNum = collectRemoteService.countCollectByTargetIdAndTargetType(postId, CollectConstant.POST_TYPE);
+            postVO.setCollectNum(collectNum);
+        });
+        CompletableFuture<Void> tagFuture = CompletableFuture.runAsync(() -> {
+            LambdaQueryWrapper<PostTagRelation> postTagRelationLambdaQueryWrapper = new LambdaQueryWrapper<>();
+            postTagRelationLambdaQueryWrapper.eq(PostTagRelation::getPostId, postId);
+            List<PostTagRelation> postTagRelationList = postTagRelationService.list(postTagRelationLambdaQueryWrapper);
+            List<Long> tagIdList = postTagRelationList.stream().map(PostTagRelation::getTagId).collect(Collectors.toList());
+
+            List<String> tagNameList = tagMapper.selectBatchIds(tagIdList).stream().map(Tag::getTagName).collect(Collectors.toList());
+            postVO.setTags(tagNameList);
+        });
+        CompletableFuture.allOf(commentNumFuture, collectNumFuture, tagFuture).join();
+        return postVO;
+    }
+
+    private PostVO convertPostDocumentToPostVO(PostDocument postDocument) {
+        PostVO postVO = new PostVO();
+        postVO.setId(Long.valueOf(postDocument.getId()));
+        postVO.setUserId(postDocument.getUserId());
+        postVO.setPostTitle(postDocument.getPostTitle());
+        postVO.setPostContent(postDocument.getPostContent());
+        postVO.setPostPictures(postDocument.getPostPictures());
+        postVO.setUserAt(postDocument.getUserAt());
+        postVO.setLikeNum(postDocument.getLikeNum());
+        postVO.setVisible(PostConstant.ALL_PEOPLE);
+        postVO.setTags(postDocument.getTags());
+        postVO.setCreateTime(postDocument.getCreateTime());
+        postVO.setUpdateTime(postDocument.getUpdateTime());
+
+        // 设置评论数、收藏数
+        Long postId = Long.valueOf(postDocument.getId());
+        CompletableFuture<Void> commentNumFuture = CompletableFuture.runAsync(() -> {
+            Integer commentNum = commentRemoteService.countCommentByPostId(postId);
+            postVO.setCommentNum(commentNum);
+        });
+        CompletableFuture<Void> collectNumFuture = CompletableFuture.runAsync(() -> {
+            Integer collectNum = collectRemoteService.countCollectByTargetIdAndTargetType(postId, CollectConstant.POST_TYPE);
+            postVO.setCollectNum(collectNum);
+        });
+        CompletableFuture.allOf(commentNumFuture, collectNumFuture).join();
         return postVO;
     }
 }

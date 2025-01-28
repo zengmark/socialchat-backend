@@ -192,7 +192,7 @@ public class LikeRocketMQConsumer implements RocketMQListener<String> {
         Long likeCountRedis = redisTemplate.opsForValue().increment(likeCountRedisKey, LikeConstant.LIKE.equals(likeAction) ? 1 : -1);
 
         // 判断点赞数是否超过阈值，超过阈值，如果是帖子数据，直接同步到ES
-        if (likeCountRedis != null && likeCountRedis % 10 == 0 && LikeConstant.POST_TYPE.equals(targetType)) {
+        if (likeCountRedis != null && likeCountRedis % LikeConstant.LIKE_THRESHOLD == 0 && LikeConstant.POST_TYPE.equals(targetType)) {
             postRemoteService.syncLikeToESPartialUpdate(targetId, likeCountRedis);
         }
 

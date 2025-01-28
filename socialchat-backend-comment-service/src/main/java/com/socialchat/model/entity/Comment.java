@@ -28,9 +28,11 @@ public class Comment implements Serializable {
     private String userAvatar;
     //评论帖子ID
     private Long postId;
+    //评论的顶层评论类型，评论帖子，则为 postId，评论评论，则为最顶层评论的 commentId
+    private Long parentId;
     //评论类型，0 代表评论的是帖子，1 代表评论的是评论
     private Integer targetType;
-    //评论源ID
+    //被评论的帖子/评论的ID
     private Long targetId;
     //评论内容
     private String commentContent;

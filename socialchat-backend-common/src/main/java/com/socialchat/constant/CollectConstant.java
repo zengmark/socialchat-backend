@@ -1,5 +1,8 @@
 package com.socialchat.constant;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 public interface CollectConstant {
 
     Integer COLLECT = 0;
@@ -18,10 +21,17 @@ public interface CollectConstant {
 
     Long MAX_COLLECT_RECORD_LENGTH = 1000L;
 
-    Integer MAX_COLLECT_RETRIES = 3;
 
     Integer POST_TYPE = 0;
 
     Integer CHAT_TYPE = 1;
+
+    Integer MAX_COLLECT_RETRIES = 5;
+
+    Long COLLECT_TIME_INTERVAL = 200L;
+
+    TimeUnit TIME_UNIT = TimeUnit.MICROSECONDS;
+
+    Duration COLLECT_LOCK_EXPIRE_TIME = Duration.ofSeconds(10);
 
 }

@@ -1,6 +1,7 @@
 package com.socialchat.provider;
 
 import com.socialchat.api.PostRemoteService;
+import com.socialchat.constant.LikeConstant;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
@@ -27,7 +28,7 @@ public class PostRemoteServiceImpl implements PostRemoteService {
         // 构建部分更新请求
         UpdateQuery updateQuery = UpdateQuery.builder(postDocumentId)
                 .withScript("ctx._source.likeNum = params.likeNum")
-                .withParams(Collections.singletonMap("likeNum", likeCount))
+                .withParams(Collections.singletonMap(LikeConstant.LIKE_NUM, likeCount))
                 .build();
 
         // 执行部分更新

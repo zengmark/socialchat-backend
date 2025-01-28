@@ -31,6 +31,8 @@ public class PostVO implements Serializable {
 
     private Integer visible;
 
+    private List<String> tags;
+
     private Date createTime;
 
     private Date updateTime;

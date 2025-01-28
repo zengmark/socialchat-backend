@@ -31,6 +31,16 @@ public class PostSaveRequest implements Serializable {
     private VoteRequest voteRequest;
 
     /**
+     * 标签项
+     */
+    private List<String> tags;
+
+    /**
+     * 标签项对应id集合
+     */
+    private List<Long> tagIds;
+
+    /**
      * 投票功能项
      */
     @Data

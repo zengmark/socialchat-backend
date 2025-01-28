@@ -75,7 +75,7 @@ public class PostScheduler {
 
             MediaType mediaType = MediaType.parse("application/json; charset=utf-8");
             String requestJSONTemplate = "{\"pageSize\":20,\"sortOrder\":\"descend\",\"sortField\":\"createTime\",\"tags\":[],\"current\":%d,\"reviewStatus\":1}";
-            int current = 798;
+            int current = 776;
             while (true) {
                 // 构造本次请求请求体
                 String requestJSON = String.format(requestJSONTemplate, current);
@@ -157,7 +157,7 @@ public class PostScheduler {
 
                     return UpdateQuery.builder(postId)
                             .withScript("ctx._source.likeNum = params.likeNum")
-                            .withParams(Collections.singletonMap("likeNum", likeNum))
+                            .withParams(Collections.singletonMap(LikeConstant.LIKE_NUM, likeNum))
                             .build();
                 }).collect(Collectors.toList());
 

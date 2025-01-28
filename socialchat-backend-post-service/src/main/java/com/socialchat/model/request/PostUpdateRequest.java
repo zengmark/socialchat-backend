@@ -10,4 +10,5 @@ public class PostUpdateRequest extends PostSaveRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long postId;
+
 }

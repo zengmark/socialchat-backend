@@ -11,6 +11,7 @@ import com.socialchat.exception.BusinessException;
 import com.socialchat.helper.ImageServiceHelper;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
+import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
@@ -69,7 +70,7 @@ public class PostController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "更新帖子餐宿不能为空");
         }
         boolean flag = postService.updatePost(request);
-        return ResultUtils.success(true);
+        return ResultUtils.success(flag);
     }
 
     @ApiOperation("删除帖子")
@@ -101,6 +102,16 @@ public class PostController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
         }
         PostSearchPageVO postVOPage = postService.listHomePosts(request);
+        return ResultUtils.success(postVOPage);
+    }
+
+    @ApiOperation("根据搜索词、标签获取帖子数据")
+    @PostMapping("/listSearchPosts")
+    public BaseResponse<PostSearchPageVO> listSearchPosts(@RequestBody PostSearchRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        PostSearchPageVO postVOPage = postService.listSearchPosts(request);
         return ResultUtils.success(postVOPage);
     }
 

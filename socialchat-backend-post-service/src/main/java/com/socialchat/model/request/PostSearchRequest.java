@@ -3,6 +3,8 @@ package com.socialchat.model.request;
 import com.socialchat.common.PageRequest;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class PostSearchRequest extends PageRequest {
 
@@ -14,6 +16,6 @@ public class PostSearchRequest extends PageRequest {
     /**
      * 标签项
      */
-    private String tag;
+    private List<String> tagList;
 
 }

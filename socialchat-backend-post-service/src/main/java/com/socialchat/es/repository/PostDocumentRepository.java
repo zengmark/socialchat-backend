@@ -2,7 +2,9 @@ package com.socialchat.es.repository;
 
 import com.socialchat.es.document.PostDocument;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.elasticsearch.annotations.Query;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Repository;
 
@@ -40,5 +42,13 @@ public interface PostDocumentRepository extends ElasticsearchRepository<PostDocu
      * @return
      */
     Page<PostDocument> findByPostTitleContainingOrPostContentContainingAndTagsIn(String postTitle, String postContent, List<String> tags, Pageable pageable);
+
+    /**
+     * 根据创建时间倒序分页查询
+     *
+     * @param pageRequest
+     * @return
+     */
+    Page<PostDocument> findAllByOrderByCreateTimeDesc(PageRequest pageRequest);
 
 }

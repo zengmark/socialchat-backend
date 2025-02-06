@@ -48,6 +48,16 @@ public class CollectRemoteServiceImpl implements CollectRemoteService {
         return collectCount;
     }
 
+    @Override
+    public Boolean checkCollect(Long userId, Long targetId, Integer targetType) {
+        LambdaQueryWrapper<Collect> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Collect::getCollectUserId, userId);
+        queryWrapper.eq(Collect::getTargetId, targetId);
+        queryWrapper.eq(Collect::getTargetType, targetType);
+        Collect collect = collectMapper.selectOne(queryWrapper);
+        return collect != null && CollectConstant.COLLECT.equals(collect.getCollectAction());
+    }
+
     private Integer updateCollectDataToRedis(Long targetId, Integer targetType) {
         // 先加分布式锁
         String collectLockKey = String.format(CollectConstant.COLLECT_LOCK_KEY, targetType, targetId);

@@ -86,6 +86,16 @@ public class LikeRemoteServiceImpl implements LikeRemoteService {
         return likeCount;
     }
 
+    @Override
+    public Boolean checkLike(Long userId, Long targetId, Integer targetType) {
+        LambdaQueryWrapper<Like> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Like::getLikeUserId, userId);
+        queryWrapper.eq(Like::getTargetId, targetId);
+        queryWrapper.eq(Like::getTargetType, targetType);
+        Like like = likeMapper.selectOne(queryWrapper);
+        return like != null && LikeConstant.LIKE.equals(like.getLikeAction());
+    }
+
     private Integer updateLikeDataToRedis(Long targetId, Integer targetType) {
         // 先加分布式锁
         String likeLockKey = String.format(LikeConstant.LIKE_LOCK_KEY, targetType, targetId);

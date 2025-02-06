@@ -13,6 +13,7 @@ import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.vo.PostCommentVO;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
@@ -113,6 +114,13 @@ public class PostController {
         }
         PostSearchPageVO postVOPage = postService.listSearchPosts(request);
         return ResultUtils.success(postVOPage);
+    }
+
+    @ApiOperation("获取帖子详情")
+    @PostMapping("/getPostByPostId")
+    public BaseResponse<PostCommentVO> getPostByPostId(@RequestParam Long postId) {
+        PostCommentVO postCommentVO = postService.getPostByPostId(postId);
+        return ResultUtils.success(postCommentVO);
     }
 
 }

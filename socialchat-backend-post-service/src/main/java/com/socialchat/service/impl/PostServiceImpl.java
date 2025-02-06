@@ -1,5 +1,6 @@
 package com.socialchat.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -14,6 +15,7 @@ import com.socialchat.common.PageRequest;
 import com.socialchat.constant.CollectConstant;
 import com.socialchat.constant.LikeConstant;
 import com.socialchat.constant.PostConstant;
+import com.socialchat.constant.UserConstant;
 import com.socialchat.dao.PostMapper;
 import com.socialchat.dao.PostTagRelationMapper;
 import com.socialchat.dao.TagMapper;
@@ -26,11 +28,14 @@ import com.socialchat.model.entity.Post;
 import com.socialchat.model.entity.PostTagRelation;
 import com.socialchat.model.entity.Tag;
 import com.socialchat.model.entity.Vote;
+import com.socialchat.model.remote.comment.CommentPostDTO;
 import com.socialchat.model.remote.user.UserDTO;
 import com.socialchat.model.request.PostOwnRequest;
 import com.socialchat.model.request.PostSaveRequest;
 import com.socialchat.model.request.PostSearchRequest;
 import com.socialchat.model.request.PostUpdateRequest;
+import com.socialchat.model.session.UserSession;
+import com.socialchat.model.vo.PostCommentVO;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
 import com.socialchat.service.PostService;
@@ -334,7 +339,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         if (PostConstant.ALL_PEOPLE.equals(visible)) {
             // 保存 post 到 ES
             savePostToEs(request, postId);
-        } else if(PostConstant.HIDE.equals(visible)) {
+        } else if (PostConstant.HIDE.equals(visible)) {
             // 删除 es 中对应的 post
             postDocumentRepository.deleteById(String.valueOf(postId));
         }
@@ -513,6 +518,30 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return postSearchPageVO;
     }
 
+    @Override
+    public PostCommentVO getPostByPostId(Long postId) {
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "帖子不存在");
+        }
+        PostCommentVO postCommentVO = new PostCommentVO();
+        // todo：判断用户是否点过赞、收过藏
+        UserSession userSession = null;
+        if (StpUtil.isLogin()) {
+            userSession = (UserSession) StpUtil.getTokenSession().get(UserConstant.USERINFO);
+            Long userId = userSession.getId();
+            Boolean liked = likeRemoteService.checkLike(userId, postId, LikeConstant.POST_TYPE);
+            Boolean collected = collectRemoteService.checkCollect(userId, postId, CollectConstant.POST_TYPE);
+            postCommentVO.setLiked(liked);
+            postCommentVO.setCollected(collected);
+        }
+        PostVO postVO = convertPostToPostVO(post);
+        List<PostCommentVO.PostComment> commentList = constructPostCommentList(post, userSession);
+        postCommentVO.setPostVO(postVO);
+        postCommentVO.setCommentList(commentList);
+        return postCommentVO;
+    }
+
     public PageImpl<PostDocument> searchPosts(String keyword, List<String> tagNames, int current, int pageSize) {
         Pageable pageable = Pageable.ofSize(pageSize).withPage(current - 1);
 
@@ -640,6 +669,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             postTagRelationLambdaQueryWrapper.eq(PostTagRelation::getPostId, postId);
             List<PostTagRelation> postTagRelationList = postTagRelationService.list(postTagRelationLambdaQueryWrapper);
             List<Long> tagIdList = postTagRelationList.stream().map(PostTagRelation::getTagId).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(tagIdList)) {
+                postVO.setTags(new ArrayList<>());
+                return;
+            }
 
             List<String> tagNameList = tagMapper.selectBatchIds(tagIdList).stream().map(Tag::getTagName).collect(Collectors.toList());
             postVO.setTags(tagNameList);
@@ -674,6 +707,74 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         });
         CompletableFuture.allOf(commentNumFuture, collectNumFuture).join();
         return postVO;
+    }
+
+    private List<PostCommentVO.PostComment> constructPostCommentList(Post post, UserSession userSession) {
+        Page<CommentPostDTO> commentPostDTOPage = commentRemoteService.listCommentUnderPost(post.getId(), 1L, 10L);
+        List<CommentPostDTO> commentPostDTOList = commentPostDTOPage.getRecords();
+        return commentPostDTOList.stream().map(commentPostDTO -> {
+            PostCommentVO.PostComment postComment = new PostCommentVO.PostComment();
+            postComment.setCommentId(commentPostDTO.getId());
+            postComment.setUserId(commentPostDTO.getUserId());
+            postComment.setUserName(commentPostDTO.getUserName());
+            postComment.setUserAvatar(commentPostDTO.getUserAvatar());
+            postComment.setPostId(commentPostDTO.getPostId());
+            postComment.setParentId(commentPostDTO.getParentId());
+            postComment.setTargetType(commentPostDTO.getTargetType());
+            postComment.setTargetId(commentPostDTO.getTargetId());
+            postComment.setCommentContent(commentPostDTO.getCommentContent());
+            postComment.setTargetUserId(commentPostDTO.getTargetUserId());
+            postComment.setTargetUserName(commentPostDTO.getTargetUserName());
+            postComment.setTargetUserAvatar(commentPostDTO.getTargetUserAvatar());
+            postComment.setCreateTime(commentPostDTO.getCreateTime());
+
+            // 判断是否点过赞
+            if (userSession != null) {
+                Long userId = userSession.getId();
+                Boolean liked = likeRemoteService.checkLike(userId, commentPostDTO.getId(), LikeConstant.COMMENT_TYPE);
+                postComment.setLiked(liked);
+            }
+
+            // 设置点赞数
+            Integer likeNum = likeRemoteService.countLikeByTargetIdAndTargetType(commentPostDTO.getId(), LikeConstant.COMMENT_TYPE);
+            postComment.setLikeNum(likeNum);
+
+            List<CommentPostDTO> bestCommentData = commentPostDTO.getBestCommentData();
+            List<PostCommentVO.PostComment> innerCommentList = bestCommentData.stream().map(innerCommentPostDTO -> {
+                PostCommentVO.PostComment innerPostComment = new PostCommentVO.PostComment();
+                innerPostComment.setCommentId(innerCommentPostDTO.getId());
+                innerPostComment.setUserId(innerCommentPostDTO.getUserId());
+                innerPostComment.setUserName(innerCommentPostDTO.getUserName());
+                innerPostComment.setUserAvatar(innerCommentPostDTO.getUserAvatar());
+                innerPostComment.setPostId(innerCommentPostDTO.getPostId());
+                innerPostComment.setParentId(innerCommentPostDTO.getParentId());
+                innerPostComment.setTargetType(innerCommentPostDTO.getTargetType());
+                innerPostComment.setTargetId(innerCommentPostDTO.getTargetId());
+                innerPostComment.setCommentContent(innerCommentPostDTO.getCommentContent());
+                innerPostComment.setTargetUserId(innerCommentPostDTO.getTargetUserId());
+                innerPostComment.setTargetUserName(innerCommentPostDTO.getTargetUserName());
+                innerPostComment.setTargetUserAvatar(innerCommentPostDTO.getTargetUserAvatar());
+                innerPostComment.setCreateTime(innerCommentPostDTO.getCreateTime());
+                innerPostComment.setInnerCommentList(new ArrayList<>());
+
+                // 判断是否点过赞
+                if (userSession != null) {
+                    Long userId = userSession.getId();
+                    Boolean insideLiked = likeRemoteService.checkLike(userId, innerCommentPostDTO.getId(), LikeConstant.COMMENT_TYPE);
+                    innerPostComment.setLiked(insideLiked);
+                }
+
+                // 设置点赞数
+                Integer innerLikeNum = likeRemoteService.countLikeByTargetIdAndTargetType(innerCommentPostDTO.getId(), LikeConstant.COMMENT_TYPE);
+                innerPostComment.setLikeNum(innerLikeNum);
+
+                return innerPostComment;
+            }).collect(Collectors.toList());
+            postComment.setInnerCommentList(innerCommentList);
+
+            return postComment;
+        }).collect(Collectors.toList());
+
     }
 }
 

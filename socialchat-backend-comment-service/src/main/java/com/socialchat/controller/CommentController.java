@@ -9,6 +9,7 @@ import com.socialchat.common.PageRequest;
 import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.request.CommentAddRequest;
+import com.socialchat.model.request.CommentPageRequest;
 import com.socialchat.model.vo.CommentVO;
 import com.socialchat.service.CommentService;
 import io.swagger.annotations.Api;
@@ -53,14 +54,34 @@ public class CommentController {
         return ResultUtils.success(flag);
     }
 
-    @ApiOperation("查询自己评论历史")
-    @PostMapping("/listOwnCommentHistory")
-    @AuthCheck
-    public BaseResponse<Page<CommentVO>> listOwnCommentHistory(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
+    @ApiOperation("帖子下分页查询评论")
+    @PostMapping("/listCommentByPostId")
+    public BaseResponse<Page<CommentVO>> listCommentByPostId(@RequestBody CommentPageRequest request) {
         if (request == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "分页参数不能为空");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "查询评论参数不能为空");
         }
-        Page<CommentVO> commentVOPage = commentService.listOwnCommentHistory(pageRequest, request);
+        Page<CommentVO> commentVOPage = commentService.listCommentByPostId(request);
         return ResultUtils.success(commentVOPage);
     }
+
+    @ApiOperation("评论下分页查询评论")
+    @PostMapping("/listCommentByCommentId")
+    public BaseResponse<CommentVO> listCommentByCommentId(@RequestBody CommentPageRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "查询评论参数不能为空");
+        }
+        CommentVO commentVO = commentService.listCommentByCommentId(request);
+        return ResultUtils.success(commentVO);
+    }
+
+//    @ApiOperation("查询自己评论历史")
+//    @PostMapping("/listOwnCommentHistory")
+//    @AuthCheck
+//    public BaseResponse<Page<CommentVO>> listOwnCommentHistory(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
+//        if (request == null) {
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR, "分页参数不能为空");
+//        }
+//        Page<CommentVO> commentVOPage = commentService.listOwnCommentHistory(pageRequest, request);
+//        return ResultUtils.success(commentVOPage);
+//    }
 }

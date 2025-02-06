@@ -43,4 +43,14 @@ public interface LikeRemoteService {
      * @return
      */
     Integer countLikeByTargetIdAndTargetType(Long targetId, Integer targetType);
+
+    /**
+     * 判断用户是否点过赞
+     *
+     * @param userId
+     * @param targetId
+     * @param targetType
+     * @return
+     */
+    Boolean checkLike(Long userId, Long targetId, Integer targetType);
 }

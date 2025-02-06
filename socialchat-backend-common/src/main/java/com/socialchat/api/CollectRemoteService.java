@@ -11,4 +11,13 @@ public interface CollectRemoteService {
      */
     Integer countCollectByTargetIdAndTargetType(Long targetId, Integer targetType);
 
+    /**
+     * 判断用户是否收过藏
+     *
+     * @param userId
+     * @param targetId
+     * @param targetType
+     * @return
+     */
+    Boolean checkCollect(Long userId, Long targetId, Integer targetType);
 }

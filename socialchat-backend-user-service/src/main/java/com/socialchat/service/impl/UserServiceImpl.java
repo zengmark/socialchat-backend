@@ -151,7 +151,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public boolean deleteUser() {
-        UserSession userSession = (UserSession) StpUtil.getSession().get(UserConstant.USERINFO);
+        UserSession userSession = (UserSession) StpUtil.getTokenSession().get(UserConstant.USERINFO);
         int delete = userMapper.deleteById(userSession.getId());
         if (delete == 0) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户删除失败，用户已不存在");

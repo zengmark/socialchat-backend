@@ -50,6 +50,8 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.ScriptQueryBuilder;
 import org.elasticsearch.script.Script;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageImpl;
@@ -486,28 +488,28 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         postSearchPageVO.setSize(pageSize);
 
         // 如果是查找热点数据
-        Sort sort;
-        if (PostConstant.HOT.equals(sortField)) {
-            sort = Sort.by(Sort.Order.desc(LikeConstant.LIKE_NUM), Sort.Order.desc(PostConstant.CREATE_TIME));
-        } else {
-            sort = Sort.by(Sort.Order.desc(PostConstant.CREATE_TIME));
-        }
+//        Sort sort;
+//        if (PostConstant.HOT.equals(sortField)) {
+//            sort = Sort.by(Sort.Order.desc(LikeConstant.LIKE_NUM), Sort.Order.desc(PostConstant.CREATE_TIME));
+//        } else {
+//            sort = Sort.by(Sort.Order.desc(PostConstant.CREATE_TIME));
+//        }
 
-        org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(current - 1, pageSize, sort);
-        org.springframework.data.domain.Page<PostDocument> postDocumentPage;
-        List<PostDocument> postDocumentList;
-        long total;
+//        org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(current - 1, pageSize, sort);
+        PageImpl<PostDocument> postDocumentPageImpl = searchPosts(searchWord, tagList, current, pageSize, sortField);
+        List<PostDocument> postDocumentList = postDocumentPageImpl.getContent();
+        long total = postDocumentPageImpl.getTotalElements();
         // 如果标签项不为空
-        if (CollectionUtils.isNotEmpty(tagList)) {
+//        if (CollectionUtils.isNotEmpty(tagList)) {
 //            postDocumentPage = postDocumentRepository.findByPostTitleContainingOrPostContentContainingAndTagsIn(searchWord, searchWord, tagList, pageRequest);
-            PageImpl<PostDocument> postDocumentPageImpl = searchPosts(searchWord, tagList, current, pageSize);
-            postDocumentList = postDocumentPageImpl.getContent();
-            total = postDocumentPageImpl.getTotalElements();
-        } else {
-            postDocumentPage = postDocumentRepository.findByPostTitleContainingOrPostContentContaining(searchWord, searchWord, pageRequest);
-            postDocumentList = postDocumentPage.getContent();
-            total = postDocumentPage.getTotalElements();
-        }
+//            PageImpl<PostDocument> postDocumentPageImpl = searchPosts(searchWord, tagList, current, pageSize);
+//            postDocumentList = postDocumentPageImpl.getContent();
+//            total = postDocumentPageImpl.getTotalElements();
+//        } else {
+//            org.springframework.data.domain.Page<PostDocument> postDocumentPage = postDocumentRepository.findByPostTitleContainingOrPostContentContaining(searchWord, searchWord, pageRequest);
+//            postDocumentList = postDocumentPage.getContent();
+//            total = postDocumentPage.getTotalElements();
+//        }
 
 //        postDocumentList = postDocumentPage.getContent();
 //        long total = postDocumentPage.getTotalElements();
@@ -542,12 +544,11 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return postCommentVO;
     }
 
-    public PageImpl<PostDocument> searchPosts(String keyword, List<String> tagNames, int current, int pageSize) {
+    public PageImpl<PostDocument> searchPosts(String keyword, List<String> tagNames, int current, int pageSize, String sortField) {
         Pageable pageable = Pageable.ofSize(pageSize).withPage(current - 1);
 
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-
         // 构建标题和内容的OR条件
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         BoolQueryBuilder titleContentQuery = QueryBuilders.boolQuery();
         titleContentQuery.should(QueryBuilders.matchQuery("postTitle", keyword));
         titleContentQuery.should(QueryBuilders.matchQuery("postContent", keyword));
@@ -558,15 +559,54 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             boolQuery.must(QueryBuilders.termsQuery("tags", tagNames));
         }
 
-        NativeSearchQuery searchQuery = new NativeSearchQuery(boolQuery);
-        searchQuery.setPageable(pageable);
+        // 构建搜索查询
+        NativeSearchQueryBuilder searchQueryBuilder = new NativeSearchQueryBuilder()
+                .withQuery(boolQuery)
+                .withPageable(pageable);
 
+        // 根据 sortField 判断排序逻辑
+        if (PostConstant.HOT.equals(sortField)) {
+            // 如果 sortField 是 "hot"，按 likeNum 倒序排序，再按 createTime 倒序排序
+            searchQueryBuilder.withSorts(SortBuilders.fieldSort(LikeConstant.LIKE_NUM).order(SortOrder.DESC),
+                    SortBuilders.fieldSort(PostConstant.CREATE_TIME).order(SortOrder.ASC));
+        } else {
+            // 如果不是 "hot"，只按 createTime 倒序排序
+            searchQueryBuilder.withSorts(SortBuilders.fieldSort(PostConstant.CREATE_TIME).order(SortOrder.DESC));
+        }
+
+        NativeSearchQuery searchQuery = searchQueryBuilder.build();
+
+        // 执行查询
         SearchHits<PostDocument> searchHits = elasticsearchRestTemplate.search(searchQuery, PostDocument.class);
         List<PostDocument> results = searchHits.stream()
                 .map(SearchHit::getContent)
                 .collect(Collectors.toList());
 
+        // 返回分页结果
         return new PageImpl<>(results, pageable, searchHits.getTotalHits());
+
+//        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+//
+//        // 构建标题和内容的OR条件
+//        BoolQueryBuilder titleContentQuery = QueryBuilders.boolQuery();
+//        titleContentQuery.should(QueryBuilders.matchQuery("postTitle", keyword));
+//        titleContentQuery.should(QueryBuilders.matchQuery("postContent", keyword));
+//        boolQuery.must(titleContentQuery);
+//
+//        // 如果tags不为空，添加tags的匹配条件
+//        if (tagNames != null && !tagNames.isEmpty()) {
+//            boolQuery.must(QueryBuilders.termsQuery("tags", tagNames));
+//        }
+//
+//        NativeSearchQuery searchQuery = new NativeSearchQuery(boolQuery);
+//        searchQuery.setPageable(pageable);
+//
+//        SearchHits<PostDocument> searchHits = elasticsearchRestTemplate.search(searchQuery, PostDocument.class);
+//        List<PostDocument> results = searchHits.stream()
+//                .map(SearchHit::getContent)
+//                .collect(Collectors.toList());
+//
+//        return new PageImpl<>(results, pageable, searchHits.getTotalHits());
 
 //        NativeSearchQueryBuilder queryBuilder = new NativeSearchQueryBuilder();
 //
@@ -577,7 +617,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
 //        shouldQueryBuilder.should(QueryBuilders.matchQuery("postTitle", keyword));
 //        shouldQueryBuilder.should(QueryBuilders.matchQuery("postContent", keyword));
 //        boolQueryBuilder.must(shouldQueryBuilder);
-//
 //
 //        // 使用脚本查询
 //        if (tagNames != null && !tagNames.isEmpty()) {
@@ -654,8 +693,12 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         postVO.setPostPictures(post.getPostPictureList());
         postVO.setUserAt(post.getUserAtList());
 
-        // 设置评论数、收藏数、tag 标签
+        // 设置点赞数、评论数、收藏数、tag 标签
         Long postId = post.getId();
+        CompletableFuture<Void> likeNumFuture = CompletableFuture.runAsync(() -> {
+            Integer likeNum = likeRemoteService.countLikeByTargetIdAndTargetType(postId, LikeConstant.POST_TYPE);
+            postVO.setLikeNum(likeNum);
+        });
         CompletableFuture<Void> commentNumFuture = CompletableFuture.runAsync(() -> {
             Integer commentNum = commentRemoteService.countCommentByPostId(postId);
             postVO.setCommentNum(commentNum);
@@ -677,7 +720,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             List<String> tagNameList = tagMapper.selectBatchIds(tagIdList).stream().map(Tag::getTagName).collect(Collectors.toList());
             postVO.setTags(tagNameList);
         });
-        CompletableFuture.allOf(commentNumFuture, collectNumFuture, tagFuture).join();
+        CompletableFuture.allOf(likeNumFuture, commentNumFuture, collectNumFuture, tagFuture).join();
         return postVO;
     }
 

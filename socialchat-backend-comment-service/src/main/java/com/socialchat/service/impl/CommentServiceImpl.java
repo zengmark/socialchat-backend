@@ -84,11 +84,17 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         // 评论记录表删除评论记录
         int delete = commentMapper.deleteById(commentId);
 
+        // 判断该条评论下是否还有子评论，有的话一并删除
+        LambdaQueryWrapper<Comment> commentQueryWrapper = new LambdaQueryWrapper<>();
+        commentQueryWrapper.eq(Comment::getParentId, commentId);
+        commentQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
+        commentMapper.delete(commentQueryWrapper);
+
         // 评论计数表更新评论计数
-        LambdaQueryWrapper<CommentCount> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(CommentCount::getTargetId, targetId);
-        queryWrapper.eq(CommentCount::getTargetType, targetType);
-        CommentCount commentCount = commentCountMapper.selectOne(queryWrapper);
+        LambdaQueryWrapper<CommentCount> commentCountQueryWrapper = new LambdaQueryWrapper<>();
+        commentCountQueryWrapper.eq(CommentCount::getTargetId, targetId);
+        commentCountQueryWrapper.eq(CommentCount::getTargetType, targetType);
+        CommentCount commentCount = commentCountMapper.selectOne(commentCountQueryWrapper);
         if (commentCount != null) {
             commentCount.setCommentNum(commentCount.getCommentNum() - 1);
         }
@@ -107,6 +113,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         LambdaQueryWrapper<Comment> outsideQueryWrapper = new LambdaQueryWrapper<>();
         outsideQueryWrapper.eq(Comment::getTargetId, parentId);
         outsideQueryWrapper.eq(Comment::getTargetType, CommentConstant.POST);
+        outsideQueryWrapper.orderByDesc(Comment::getCreateTime);
         Page<Comment> outsideCommentPage = commentMapper.selectPage(new Page<>(current, pageSize), outsideQueryWrapper);
         List<Comment> outsideCommentList = outsideCommentPage.getRecords();
         // 构造外层评论
@@ -120,6 +127,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             LambdaQueryWrapper<Comment> innerQueryWrapper = new LambdaQueryWrapper<>();
             innerQueryWrapper.eq(Comment::getParentId, outsideComment.getId());
             innerQueryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
+            innerQueryWrapper.orderByDesc(Comment::getCreateTime);
             Page<Comment> innerCommentPage = commentMapper.selectPage(new Page<>(1L, 10L), innerQueryWrapper);
             List<Comment> innerCommentList = innerCommentPage.getRecords();
             List<CommentVO> innerCommentVOList = innerCommentList.stream().map(innerComment -> {
@@ -154,6 +162,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         LambdaQueryWrapper<Comment> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Comment::getParentId, parentId);
         queryWrapper.eq(Comment::getTargetType, CommentConstant.COMMENT);
+        queryWrapper.orderByDesc(Comment::getCreateTime);
         Page<Comment> innerCommentPage = commentMapper.selectPage(new Page<>(current, pageSize), queryWrapper);
         List<Comment> innerCommentList = innerCommentPage.getRecords();
 

@@ -7,6 +7,7 @@ import com.socialchat.common.BaseResponse;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.common.ResultUtils;
 import com.socialchat.exception.BusinessException;
+import com.socialchat.model.entity.User;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
 import com.socialchat.model.vo.UserVO;
@@ -93,5 +94,12 @@ public class UserController {
     public BaseResponse<UserVO> getLoginUser() {
         UserVO userVO = userService.getLoginUser();
         return ResultUtils.success(userVO);
+    }
+
+    @ApiOperation("根据用户ID获取用户信息")
+    @PostMapping("/getUserInfoByUserId")
+    public BaseResponse<User> getUserInfoByUserId(@RequestParam Long userId) {
+        User user = userService.getById(userId);
+        return ResultUtils.success(user);
     }
 }

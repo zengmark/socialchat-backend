@@ -16,14 +16,18 @@ import com.socialchat.model.request.PostUpdateRequest;
 import com.socialchat.model.vo.PostCommentVO;
 import com.socialchat.model.vo.PostSearchPageVO;
 import com.socialchat.model.vo.PostVO;
+import com.socialchat.model.vo.TagVO;
 import com.socialchat.service.PostService;
+import com.socialchat.service.TagService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 @RestController
 @Api(tags = "帖子模块")
@@ -35,6 +39,9 @@ public class PostController {
 
     @Resource
     private ImageServiceHelper imageServiceHelper;
+
+    @Resource
+    private TagService tagService;
 
     @ApiOperation("测试接口")
     @GetMapping("/test")
@@ -121,6 +128,13 @@ public class PostController {
     public BaseResponse<PostCommentVO> getPostByPostId(@RequestParam Long postId) {
         PostCommentVO postCommentVO = postService.getPostByPostId(postId);
         return ResultUtils.success(postCommentVO);
+    }
+
+    @ApiOperation("获取标签列表")
+    @PostMapping("/listTagList")
+    public BaseResponse<List<TagVO>> listTagList() {
+        List<TagVO> tagVOList = tagService.listTagList();
+        return ResultUtils.success(tagVOList);
     }
 
 }

@@ -12,6 +12,7 @@ import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.User;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.model.request.UserUpdateRequest;
 import com.socialchat.model.session.UserSession;
 import com.socialchat.model.vo.UserVO;
 import com.socialchat.service.UserService;
@@ -151,11 +152,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public boolean deleteUser() {
-        UserSession userSession = (UserSession) StpUtil.getTokenSession().get(UserConstant.USERINFO);
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String header = request.getHeader(UserConstant.AUTHORIZATION);
+        String token = header.substring(7);
+
+        UserSession userSession = (UserSession) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
         int delete = userMapper.deleteById(userSession.getId());
         if (delete == 0) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户删除失败，用户已不存在");
         }
+        StpUtil.logout();
         return true;
     }
 
@@ -170,6 +177,61 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         UserVO userVO = new UserVO();
         BeanUtils.copyProperties(userSession, userVO);
         return userVO;
+    }
+
+    @Override
+    public UserSession updateUserInfo(UserUpdateRequest request) {
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        HttpServletRequest httpServletRequest = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String header = httpServletRequest.getHeader(UserConstant.AUTHORIZATION);
+        String token = header.substring(7);
+
+        UserSession userSession = (UserSession) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        Long userId = userSession.getId();
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户不存在");
+        }
+
+        String userName = request.getUserName();
+        String userProfile = request.getUserProfile();
+
+        if (StringUtils.isNotBlank(userName)) {
+            user.setUserName(userName);
+        }
+        if (StringUtils.isNotBlank(userProfile)) {
+            user.setUserProfile(userProfile);
+        }
+        userMapper.updateById(user);
+
+        // 存储在 session 中，便于获取用户信息
+        BeanUtils.copyProperties(user, userSession);
+        StpUtil.getTokenSessionByToken(token).set(UserConstant.USERINFO, userSession);
+
+        return userSession;
+    }
+
+    @Override
+    public UserSession updateUserAvatar(String userAvatar) {
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        HttpServletRequest httpServletRequest = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String header = httpServletRequest.getHeader(UserConstant.AUTHORIZATION);
+        String token = header.substring(7);
+
+        UserSession userSession = (UserSession) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        Long userId = userSession.getId();
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户不存在");
+        }
+        user.setUserAvatar(userAvatar);
+        userMapper.updateById(user);
+
+        // 存储在 session 中，便于获取用户信息
+        BeanUtils.copyProperties(user, userSession);
+        StpUtil.getTokenSessionByToken(token).set(UserConstant.USERINFO, userSession);
+
+        return userSession;
     }
 
 }

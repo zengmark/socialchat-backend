@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.socialchat.model.entity.User;
 import com.socialchat.model.request.UserLoginRequest;
 import com.socialchat.model.request.UserRegisterRequest;
+import com.socialchat.model.request.UserUpdateRequest;
+import com.socialchat.model.session.UserSession;
 import com.socialchat.model.vo.UserVO;
 
 /**
@@ -51,5 +53,21 @@ public interface UserService extends IService<User> {
      * @return
      */
     UserVO getLoginUser();
+
+    /**
+     * 更新用户信息
+     *
+     * @param request
+     * @return
+     */
+    UserSession updateUserInfo(UserUpdateRequest request);
+
+    /**
+     * 更新用户头像
+     *
+     * @param userAvatar
+     * @return
+     */
+    UserSession updateUserAvatar(String userAvatar);
 }
 

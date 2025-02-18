@@ -1,6 +1,5 @@
 package com.socialchat.model.vo;
 
-import com.socialchat.model.remote.comment.CommentPostDTO;
 import lombok.Data;
 
 import java.io.Serializable;

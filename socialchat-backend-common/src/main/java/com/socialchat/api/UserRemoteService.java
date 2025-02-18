@@ -12,4 +12,9 @@ public interface UserRemoteService {
      */
     Long saveUser(UserDTO userDTO);
 
+    /**
+     * 获取用户信息
+     */
+    UserDTO getUserById(Long userId);
+
 }

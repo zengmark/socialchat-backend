@@ -9,4 +9,8 @@ public interface CommentConstant {
     Long HOT_START = 0L;
 
     Long HOT_END = 2L;
+
+    Integer NEW = 0;
+
+    Integer DELETE = 1;
 }

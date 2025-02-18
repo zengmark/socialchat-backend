@@ -3,14 +3,17 @@ package com.socialchat.provider;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.socialchat.api.UserRemoteService;
+import com.socialchat.common.ErrorCode;
 import com.socialchat.constant.UserConstant;
 import com.socialchat.dao.UserMapper;
+import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.User;
 import com.socialchat.model.remote.user.UserDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.beans.BeanUtils;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -53,5 +56,16 @@ public class UserRemoteServiceImpl implements UserRemoteService {
         userMapper.insert(user);
 
         return user.getId();
+    }
+
+    @Override
+    public UserDTO getUserById(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户不存在");
+        }
+        UserDTO userDTO = new UserDTO();
+        BeanUtils.copyProperties(user, userDTO);
+        return userDTO;
     }
 }

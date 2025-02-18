@@ -1,31 +1,28 @@
 package com.socialchat.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.socialchat.api.LikeRemoteService;
+import com.socialchat.api.MessageRemoteService;
 import com.socialchat.common.ErrorCode;
-import com.socialchat.common.PageRequest;
 import com.socialchat.constant.CommentConstant;
-import com.socialchat.constant.UserConstant;
 import com.socialchat.dao.CommentCountMapper;
 import com.socialchat.dao.CommentMapper;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.Comment;
 import com.socialchat.model.entity.CommentCount;
+import com.socialchat.model.remote.message.MessageCommentDTO;
 import com.socialchat.model.request.CommentAddRequest;
 import com.socialchat.model.request.CommentPageRequest;
-import com.socialchat.model.session.UserSession;
 import com.socialchat.model.vo.CommentVO;
 import com.socialchat.service.CommentService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,6 +44,10 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     @Resource
     private LikeRemoteService likeRemoteService;
 
+    @DubboReference
+    private MessageRemoteService messageRemoteService;
+
+    @Transactional
     @Override
     public boolean addComment(CommentAddRequest request) {
         Comment comment = new Comment();
@@ -71,11 +72,18 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         commentCount.setCommentNum(commentCount.getCommentNum() + 1);
         commentCountMapper.updateById(commentCount);
 
-        // todo：后期引入消息表后要加事物控制并插入通知信息，并且使用 SSE 作服务端消息推送
+        // 引入消息表后要加事物控制并插入通知信息，并且使用 SSE 作服务端消息推送
+        MessageCommentDTO messageCommentDTO = new MessageCommentDTO();
+        messageCommentDTO.setTargetId(comment.getId());
+        messageCommentDTO.setSourceUserId(comment.getUserId());
+        messageCommentDTO.setAcceptUserId(comment.getTargetUserId());
+        messageCommentDTO.setCommentAction(CommentConstant.NEW);
+        messageRemoteService.sendCommentMessage(messageCommentDTO);
 
         return insert > 0;
     }
 
+    @Transactional
     @Override
     public boolean deleteComment(Long commentId) {
         Comment comment = commentMapper.selectById(commentId);
@@ -99,7 +107,13 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
             commentCount.setCommentNum(commentCount.getCommentNum() - 1);
         }
 
-        // todo：引入消息表，删除未读消息数据
+        // 引入消息表，删除未读消息数据
+        MessageCommentDTO messageCommentDTO = new MessageCommentDTO();
+        messageCommentDTO.setTargetId(comment.getId());
+        messageCommentDTO.setSourceUserId(comment.getUserId());
+        messageCommentDTO.setAcceptUserId(comment.getTargetUserId());
+        messageCommentDTO.setCommentAction(CommentConstant.DELETE);
+        messageRemoteService.sendCommentMessage(messageCommentDTO);
 
         return delete > 0;
     }

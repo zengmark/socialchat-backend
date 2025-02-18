@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.constant.CollectConstant;
+import com.socialchat.constant.MessageConstant;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.dto.CollectAddDTO;
 import com.socialchat.model.entity.Collect;
 import com.socialchat.model.entity.CollectCount;
-import com.socialchat.service.CollectCountService;
-import com.socialchat.service.CollectService;
+import com.socialchat.model.entity.Message;
+import com.socialchat.model.entity.MessageCount;
+import com.socialchat.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
@@ -35,6 +37,15 @@ public class CollectRocketMQConsumer implements RocketMQListener<String> {
 
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Resource
+    private SseService sseService;
+
+    @Resource
+    private MessageService messageService;
+
+    @Resource
+    private MessageCountService messageCountService;
 
     @Override
     public void onMessage(String collectAddDTOJSON) {
@@ -134,6 +145,62 @@ public class CollectRocketMQConsumer implements RocketMQListener<String> {
 
         // 更新 Redis
         updateRedisData(targetType, targetId, collectUserId, collectAction, collectNum);
+
+        // 初始化消息记录表
+        LambdaQueryWrapper<Message> messageQueryWrapper = new LambdaQueryWrapper<>();
+        messageQueryWrapper.eq(Message::getTargetType, MessageConstant.COLLECT);
+        messageQueryWrapper.eq(Message::getTargetId, collect.getId());
+        messageQueryWrapper.eq(Message::getSourceUserId, collectUserId);
+        messageQueryWrapper.eq(Message::getAcceptUserId, userId);
+        Message message = messageService.getOne(messageQueryWrapper);
+        if (message == null) {
+            message = new Message();
+            message.setTargetType(MessageConstant.COLLECT);
+            message.setTargetId(collect.getId());
+            message.setSourceUserId(collectUserId);
+            message.setAcceptUserId(userId);
+            messageService.save(message);
+        }
+
+        message = messageService.getById(message.getId());
+
+        // 初始化消息计数表
+        LambdaQueryWrapper<MessageCount> messageCountQueryWrapper = new LambdaQueryWrapper<>();
+        messageCountQueryWrapper.eq(MessageCount::getUserId, userId);
+        MessageCount messageCount = messageCountService.getOne(messageCountQueryWrapper);
+        if (messageCount == null) {
+            messageCount = new MessageCount();
+            messageCount.setUserId(userId);
+            messageCountService.save(messageCount);
+        }
+
+        messageCount = messageCountService.getById(messageCount.getId());
+
+        // 收藏处理
+        int messageNum = messageCount.getMessageCount();
+        if (CollectConstant.COLLECT.equals(collectAction)) {
+            // 更新消息记录
+            message.setVisible(MessageConstant.NEW);
+            messageService.updateById(message);
+            // 更新消息计数
+            messageNum++;
+            messageCount.setMessageCount(messageNum);
+        }
+
+        // 取消收藏处理
+        if (CollectConstant.DISCOLLECT.equals(collectAction)) {
+            // 删除消息记录表
+            messageService.removeById(message.getId());
+            // 更新消息计数
+            messageNum--;
+            messageCount.setMessageCount(messageNum);
+        }
+
+        // 更新消息计数表
+        messageCountService.updateById(messageCount);
+
+        // 推送 SSE 消息
+        sseService.sendNotificationToUser(String.valueOf(userId), String.valueOf(messageNum));
     }
 
     /**

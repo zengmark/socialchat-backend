@@ -48,12 +48,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.ScriptQueryBuilder;
-import org.elasticsearch.script.Script;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -68,7 +65,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -527,11 +523,11 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "帖子不存在");
         }
         PostCommentVO postCommentVO = new PostCommentVO();
-        // todo：判断用户是否点过赞、收过藏
         UserSession userSession = null;
         if (StpUtil.isLogin()) {
             userSession = (UserSession) StpUtil.getTokenSession().get(UserConstant.USERINFO);
             Long userId = userSession.getId();
+            // 判断用户是否点过赞、收过藏
             Boolean liked = likeRemoteService.checkLike(userId, postId, LikeConstant.POST_TYPE);
             Boolean collected = collectRemoteService.checkCollect(userId, postId, CollectConstant.POST_TYPE);
             postCommentVO.setLiked(liked);

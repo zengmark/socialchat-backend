@@ -32,4 +32,11 @@ public interface CommentRemoteService {
      * @return
      */
     Integer countCommentByPostId(Long postId);
+
+    /**
+     * 根据 id 获取评论内容
+     * @param commentId
+     * @return
+     */
+    String getCommentContentById(Long commentId);
 }

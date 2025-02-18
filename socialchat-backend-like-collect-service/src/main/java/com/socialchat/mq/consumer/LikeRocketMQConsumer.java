@@ -3,15 +3,18 @@ package com.socialchat.mq.consumer;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.socialchat.api.MessageRemoteService;
 import com.socialchat.api.PostRemoteService;
 import com.socialchat.common.ErrorCode;
 import com.socialchat.constant.LikeConstant;
+import com.socialchat.constant.MessageConstant;
 import com.socialchat.exception.BusinessException;
 import com.socialchat.model.dto.LikeAddDTO;
 import com.socialchat.model.entity.Like;
 import com.socialchat.model.entity.LikeCount;
-import com.socialchat.service.LikeCountService;
-import com.socialchat.service.LikeService;
+import com.socialchat.model.entity.Message;
+import com.socialchat.model.entity.MessageCount;
+import com.socialchat.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
@@ -41,6 +44,18 @@ public class LikeRocketMQConsumer implements RocketMQListener<String> {
 
     @DubboReference
     private PostRemoteService postRemoteService;
+
+    @DubboReference
+    private MessageRemoteService messageRemoteService;
+
+    @Resource
+    private SseService sseService;
+
+    @Resource
+    private MessageService messageService;
+
+    @Resource
+    private MessageCountService messageCountService;
 
     @Transactional
     @Override
@@ -141,6 +156,62 @@ public class LikeRocketMQConsumer implements RocketMQListener<String> {
 
         // 更新 Redis
         updateRedisData(targetType, targetId, likeUserId, likeAction, likeNum);
+
+        // 初始化消息记录表
+        LambdaQueryWrapper<Message> messageQueryWrapper = new LambdaQueryWrapper<>();
+        messageQueryWrapper.eq(Message::getTargetType, MessageConstant.LIKE);
+        messageQueryWrapper.eq(Message::getTargetId, like.getId());
+        messageQueryWrapper.eq(Message::getSourceUserId, likeUserId);
+        messageQueryWrapper.eq(Message::getAcceptUserId, userId);
+        Message message = messageService.getOne(messageQueryWrapper);
+        if (message == null) {
+            message = new Message();
+            message.setTargetType(MessageConstant.LIKE);
+            message.setTargetId(like.getId());
+            message.setSourceUserId(likeUserId);
+            message.setAcceptUserId(userId);
+            messageService.save(message);
+        }
+
+        message = messageService.getById(message.getId());
+
+        // 初始化消息计数表
+        LambdaQueryWrapper<MessageCount> messageCountQueryWrapper = new LambdaQueryWrapper<>();
+        messageCountQueryWrapper.eq(MessageCount::getUserId, userId);
+        MessageCount messageCount = messageCountService.getOne(messageCountQueryWrapper);
+        if (messageCount == null) {
+            messageCount = new MessageCount();
+            messageCount.setUserId(userId);
+            messageCountService.save(messageCount);
+        }
+
+        messageCount = messageCountService.getById(messageCount.getId());
+
+        // 点赞处理
+        int messageNum = messageCount.getMessageCount();
+        if (LikeConstant.LIKE.equals(likeAction)) {
+            // 更新消息记录
+            message.setVisible(MessageConstant.NEW);
+            messageService.updateById(message);
+            // 更新消息计数
+            messageNum++;
+            messageCount.setMessageCount(messageNum);
+        }
+
+        // 取消点赞处理
+        if (LikeConstant.DISLIKE.equals(likeAction)) {
+            // 删除消息记录表
+            messageService.removeById(message.getId());
+            // 更新消息计数
+            messageNum--;
+            messageCount.setMessageCount(messageNum);
+        }
+
+        // 更新消息计数表
+        messageCountService.updateById(messageCount);
+
+        // 推送 SSE 消息
+        sseService.sendNotificationToUser(String.valueOf(userId), String.valueOf(messageNum));
     }
 
     /**

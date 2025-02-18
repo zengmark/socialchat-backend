@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.api.CommentRemoteService;
 import com.socialchat.api.LikeRemoteService;
+import com.socialchat.common.ErrorCode;
 import com.socialchat.constant.CommentConstant;
 import com.socialchat.dao.CommentCountMapper;
 import com.socialchat.dao.CommentMapper;
+import com.socialchat.exception.BusinessException;
 import com.socialchat.model.entity.Comment;
 import com.socialchat.model.entity.CommentCount;
 import com.socialchat.model.remote.comment.CommentPostDTO;
@@ -122,5 +124,14 @@ public class CommentRemoteServiceImpl implements CommentRemoteService {
         }
 
         return commentCount.getCommentNum();
+    }
+
+    @Override
+    public String getCommentContentById(Long commentId) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "评论不存在");
+        }
+        return comment.getCommentContent();
     }
 }

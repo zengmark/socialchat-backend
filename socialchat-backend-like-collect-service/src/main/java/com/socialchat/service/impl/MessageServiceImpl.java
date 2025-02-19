@@ -2,6 +2,8 @@ package com.socialchat.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.socialchat.api.CommentRemoteService;
@@ -18,8 +20,10 @@ import com.socialchat.model.session.UserSession;
 import com.socialchat.model.vo.MessageVO;
 import com.socialchat.service.MessageService;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.apache.rocketmq.common.message.MessageConst;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -62,9 +66,20 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message>
 
         int current = pageRequest.getCurrent();
         int pageSize = pageRequest.getPageSize();
+        String type = pageRequest.getSortField();
+
+        Integer targetType;
+        if (MessageConstant.LIKE_TYPE.equals(type)) {
+            targetType = MessageConstant.LIKE;
+        } else if (MessageConstant.COLLECT_TYPE.equals(type)) {
+            targetType = MessageConstant.COLLECT;
+        } else {
+            targetType = MessageConstant.COMMENT;
+        }
 
         LambdaQueryWrapper<Message> messageQueryWrapper = new LambdaQueryWrapper<>();
         messageQueryWrapper.eq(Message::getAcceptUserId, acceptUserId);
+        messageQueryWrapper.eq(Message::getTargetType, targetType);
         messageQueryWrapper.orderByDesc(Message::getCreateTime);
         Page<Message> messagePage = messageMapper.selectPage(new Page<>(current, pageSize), messageQueryWrapper);
         List<Message> messageList = messagePage.getRecords();
@@ -93,6 +108,30 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message>
             messageNum = messageCount.getMessageCount();
         }
         return messageNum;
+    }
+
+    @Transactional
+    @Override
+    public boolean readMessage() {
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String header = request.getHeader(UserConstant.AUTHORIZATION);
+        String token = header.substring(7);
+
+        UserSession userSession = (UserSession) StpUtil.getTokenSessionByToken(token).get(UserConstant.USERINFO);
+        Long userId = userSession.getId();
+        LambdaUpdateWrapper<Message> messageUpdateWrapper = new LambdaUpdateWrapper<>();
+        messageUpdateWrapper.eq(Message::getAcceptUserId, userId);
+        messageUpdateWrapper.set(Message::getVisible, MessageConstant.READ);
+        messageMapper.update(null, messageUpdateWrapper);
+
+        LambdaQueryWrapper<MessageCount> messageCountQueryWrapper = new LambdaQueryWrapper<>();
+        messageCountQueryWrapper.eq(MessageCount::getUserId, userId);
+        MessageCount messageCount = messageCountMapper.selectOne(messageCountQueryWrapper);
+        messageCount.setMessageCount(0);
+        messageCountMapper.updateById(messageCount);
+
+        return true;
     }
 
     private MessageVO convertMessageToMessageVO(Message message) {

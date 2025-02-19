@@ -3,8 +3,10 @@ package com.socialchat.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.socialchat.annotation.AuthCheck;
 import com.socialchat.common.BaseResponse;
+import com.socialchat.common.ErrorCode;
 import com.socialchat.common.PageRequest;
 import com.socialchat.common.ResultUtils;
+import com.socialchat.exception.BusinessException;
 import com.socialchat.model.vo.MessageVO;
 import com.socialchat.service.MessageService;
 import io.swagger.annotations.Api;
@@ -28,6 +30,9 @@ public class MessageController {
     @PostMapping("/listMessage")
     @AuthCheck
     public BaseResponse<Page<MessageVO>> listMessage(@RequestBody PageRequest pageRequest) {
+        if (pageRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "消息参数不能为空");
+        }
         Page<MessageVO> messageVOPage = messageService.listMessage(pageRequest);
         return ResultUtils.success(messageVOPage);
     }
@@ -38,6 +43,14 @@ public class MessageController {
     public BaseResponse<Integer> getUnReadCount() {
         Integer unReadCount = messageService.getUnReadCount();
         return ResultUtils.success(unReadCount);
+    }
+
+    @ApiOperation(value = "已读消息")
+    @PostMapping("/readMessage")
+    @AuthCheck
+    public BaseResponse<Boolean> readMessage() {
+        boolean flag = messageService.readMessage();
+        return ResultUtils.success(flag);
     }
 
 }

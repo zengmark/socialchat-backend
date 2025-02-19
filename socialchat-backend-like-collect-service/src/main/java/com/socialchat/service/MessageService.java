@@ -16,6 +16,7 @@ public interface MessageService extends IService<Message> {
     /**
      * 获取消息列表
      *
+     * @param pageRequest
      * @return
      */
     Page<MessageVO> listMessage(PageRequest pageRequest);
@@ -26,4 +27,11 @@ public interface MessageService extends IService<Message> {
      * @return
      */
     Integer getUnReadCount();
+
+    /**
+     * 已读消息
+     *
+     * @return
+     */
+    boolean readMessage();
 }

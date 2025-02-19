@@ -13,4 +13,10 @@ public interface MessageConstant {
     Integer NEW = 0;
 
     Integer READ = 1;
+
+    String LIKE_TYPE = "like";
+
+    String COMMENT_TYPE = "comment";
+
+    String COLLECT_TYPE = "collect";
 }

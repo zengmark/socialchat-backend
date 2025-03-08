@@ -34,6 +34,7 @@ public class SseServiceImpl implements SseService {
     /**
      * 模拟消息推送：根据用户 ID 向指定用户推送消息
      */
+    @Override
     public void sendNotificationToUser(String userId, String message) {
         SseEmitter emitter = clientEmitters.get(userId);
         if (emitter != null) {

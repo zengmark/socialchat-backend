@@ -16,6 +16,7 @@
         <module>socialchat-backend-post-service</module>
         <module>socialchat-backend-comment-service</module>
         <module>socialchat-backend-like-collect-service</module>
+        <module>socialchat-backend-chat-service</module>
     </modules>
 
     <properties>

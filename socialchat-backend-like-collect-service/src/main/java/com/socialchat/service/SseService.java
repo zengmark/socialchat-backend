@@ -3,6 +3,7 @@ package com.socialchat.service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface SseService {
+
     /**
      * 建立连接
      *

@@ -5,7 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 @Data
-public class MessageCommentDTO implements Serializable {
+public class MessageChatDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -15,8 +15,4 @@ public class MessageCommentDTO implements Serializable {
 
     private Long acceptUserId;
 
-    /**
-     * 0 是新增，1 是删除
-     */
-    private Integer commentAction;
 }
